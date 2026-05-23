@@ -1,8 +1,11 @@
 import uuid
 import logging
 import httpx
+import time
+import asyncio
 
 from app.config import get_settings
+from sqlalchemy.ext.asyncio import AsyncSession
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -109,15 +112,18 @@ class VectorService:
     async def search(
         self,
         query_embedding: list[float],
+        query_text: str = "",
         top_k: int = 5,
         user_id: str | None = None,
+        dept_id: str | None = None,
         visible_dept_ids: list[str] | None = None,
         allowed_sensitivities: list[str] | None = None,
+        db: AsyncSession | None = None,
     ) -> list[dict]:
         """搜索相似向量"""
+        start_time = time.time()
         await self.ensure_collection()
 
-        # 构建过滤表达式
         filters = []
         if user_id:
             filters.append(f'user_id == "{user_id}"')
@@ -140,7 +146,7 @@ class VectorService:
         })
 
         hits = result.get("data", [])
-        return [
+        results = [
             {
                 "id": hit.get("id", ""),
                 "score": hit.get("distance", 0),
@@ -151,6 +157,29 @@ class VectorService:
             }
             for hit in hits
         ]
+
+        duration_ms = int((time.time() - start_time) * 1000)
+
+        if db and settings.HEATMAP_ENABLED:
+            try:
+                from app.services.heatmap_service import HeatmapService
+                heatmap_service = HeatmapService(db)
+                asyncio.create_task(heatmap_service.record_search(
+                    query_text=query_text,
+                    query_embedding=query_embedding,
+                    user_id=user_id,
+                    dept_id=dept_id,
+                    hit_docs=results,
+                    filter_conditions={
+                        "visible_dept_ids": visible_dept_ids,
+                        "allowed_sensitivities": allowed_sensitivities,
+                    },
+                    duration_ms=duration_ms,
+                ))
+            except Exception as e:
+                logger.warning(f"Failed to record heatmap: {e}")
+
+        return results
 
     async def delete(self, ids: list[str]):
         """删除向量"""
