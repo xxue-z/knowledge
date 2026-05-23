@@ -7,10 +7,13 @@ from sqlalchemy import select, text
 
 from app.config import get_settings
 from app.core.logging import setup_logging
+from app.core.trace import setup_trace_logging
+from app.middleware import TraceMiddleware
 from app.api import auth, wiki, qa, knowledge, admin, system
 
 settings = get_settings()
 setup_logging(log_dir="logs", level="DEBUG" if settings.DEBUG else "INFO")
+setup_trace_logging(log_dir="logs", level="DEBUG" if settings.DEBUG else "INFO")
 logger = logging.getLogger(__name__)
 
 # ---- 内置管理员（首次启动时使用，无需数据库） ----
@@ -41,6 +44,26 @@ async def check_system_initialized():
     except Exception as e:
         SYSTEM_INITIALIZED = False
         logger.info(f"Database not available, system not initialized: {e}")
+
+
+async def init_agents():
+    """初始化并注册所有 Agent - 注册类而不是实例"""
+    from app.agents import (
+        register_db_agent,
+        register_wiki_agent,
+        register_vector_agent,
+        register_permission_agent,
+        register_content_analysis_agent,
+        register_mindmap_agent,
+    )
+    
+    # 注册各个 Agent - 现在不需要用户和 db，因为我们注册的是类
+    register_db_agent()
+    register_wiki_agent()
+    register_vector_agent()
+    register_permission_agent()
+    register_content_analysis_agent()
+    register_mindmap_agent()
 
 
 async def ensure_default_admin():
@@ -83,6 +106,26 @@ async def lifespan(app: FastAPI):
         await ensure_default_admin()
         await check_system_initialized()
 
+    try:
+        from app.core.casbin_policy import init_policies
+        await init_policies()
+        logger.info("Casbin policies initialized")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Casbin policies: {e}")
+
+    try:
+        from app.skills import register_all_skills
+        register_all_skills()
+        logger.info("Skills registered successfully")
+    except Exception as e:
+        logger.warning(f"Failed to register skills: {e}")
+
+    try:
+        await init_agents()
+        logger.info("Agents registered successfully")
+    except Exception as e:
+        logger.warning(f"Failed to register agents: {e}")
+
     print("\n" + "=" * 50)
     print("  Knowledge Platform Backend Started")
     print("=" * 50)
@@ -118,6 +161,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Trace
+app.add_middleware(TraceMiddleware)
 
 # Routes
 app.include_router(auth.router, prefix="/api/auth", tags=["认证"])

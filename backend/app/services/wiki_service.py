@@ -19,18 +19,23 @@ class WikiService:
         page: int = 1,
         page_size: int = 20,
     ) -> list[WikiPage]:
+        if not await check_permission(self.user.roles, "wiki", "read"):
+            return []
+
         query = select(WikiPage)
         if parent_id:
             query = query.where(WikiPage.parent_id == parent_id)
         if sensitivity:
             query = query.where(WikiPage.sensitivity == sensitivity)
-        # 权限过滤：只返回用户有权访问的文档
-        query = query.where(WikiPage.sensitivity.in_(self._allowed_sensitivities()))
+        query = query.where(WikiPage.sensitivity.in_(await self._allowed_sensitivities()))
         query = query.offset((page - 1) * page_size).limit(page_size)
         result = await self.db.execute(query)
         return result.scalars().all()
 
     async def get_page(self, page_id: uuid.UUID) -> WikiPage | None:
+        if not await check_permission(self.user.roles, "wiki", "read"):
+            return None
+
         result = await self.db.execute(
             select(WikiPage).where(WikiPage.id == page_id)
         )
@@ -40,6 +45,9 @@ class WikiService:
         return page
 
     async def create_page(self, data: WikiPageCreate) -> WikiPage:
+        if not await check_permission(self.user.roles, "wiki", "write"):
+            raise PermissionError("You do not have permission to create wiki pages")
+
         page = WikiPage(
             title=data.title,
             content=data.content,
@@ -52,7 +60,6 @@ class WikiService:
         self.db.add(page)
         await self.db.flush()
 
-        # 创建初始版本
         version = WikiPageVersion(
             page_id=page.id,
             title=data.title,
@@ -66,6 +73,9 @@ class WikiService:
         return page
 
     async def update_page(self, page_id: uuid.UUID, data: WikiPageUpdate) -> WikiPage | None:
+        if not await check_permission(self.user.roles, "wiki", "write"):
+            return None
+
         result = await self.db.execute(
             select(WikiPage).where(WikiPage.id == page_id)
         )
@@ -76,13 +86,11 @@ class WikiService:
         if not await self._can_write(page.sensitivity):
             return None
 
-        # 获取最新版本号
         version_result = await self.db.execute(
             select(func.max(WikiPageVersion.version)).where(WikiPageVersion.page_id == page_id)
         )
         max_version = version_result.scalar() or 0
 
-        # 更新字段
         if data.title is not None:
             page.title = data.title
         if data.content is not None:
@@ -93,7 +101,6 @@ class WikiService:
             page.sensitivity = data.sensitivity
         page.updated_by = self.user.username
 
-        # 创建新版本
         version = WikiPageVersion(
             page_id=page.id,
             title=page.title,
@@ -107,6 +114,9 @@ class WikiService:
         return page
 
     async def delete_page(self, page_id: uuid.UUID) -> bool:
+        if not await check_permission(self.user.roles, "wiki", "delete"):
+            return False
+
         result = await self.db.execute(
             select(WikiPage).where(WikiPage.id == page_id)
         )
@@ -118,6 +128,9 @@ class WikiService:
         return True
 
     async def get_versions(self, page_id: uuid.UUID) -> list[WikiPageVersion]:
+        if not await check_permission(self.user.roles, "wiki", "read"):
+            return []
+
         result = await self.db.execute(
             select(WikiPageVersion)
             .where(WikiPageVersion.page_id == page_id)
@@ -126,39 +139,42 @@ class WikiService:
         return result.scalars().all()
 
     async def search(self, query: str, page: int = 1, page_size: int = 20) -> list[WikiPage]:
-        # PostgreSQL 全文搜索
+        if not await check_permission(self.user.roles, "wiki", "read"):
+            return []
+
         search_query = (
             select(WikiPage)
             .where(
                 func.to_tsvector("simple", WikiPage.title + " " + WikiPage.content)
                 .match(query, postgresql_regconfig="simple")
             )
-            .where(WikiPage.sensitivity.in_(self._allowed_sensitivities()))
+            .where(WikiPage.sensitivity.in_(await self._allowed_sensitivities()))
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
         result = await self.db.execute(search_query)
         return result.scalars().all()
 
-    def _allowed_sensitivities(self) -> list[str]:
-        """根据用户角色返回可访问的敏感度级别"""
+    async def _allowed_sensitivities(self) -> list[str]:
         allowed = ["public"]
-        if "manager" in self.user.roles or "hr" in self.user.roles or "admin" in self.user.roles:
-            allowed.append("internal")
-        if "hr" in self.user.roles or "admin" in self.user.roles:
-            allowed.append("confidential")
-        if "admin" in self.user.roles:
-            allowed.append("secret")
+        if await check_permission(self.user.roles, "wiki", "read"):
+            if "admin" in self.user.roles or "hr" in self.user.roles or "manager" in self.user.roles:
+                allowed.append("internal")
+            if "admin" in self.user.roles or "hr" in self.user.roles:
+                allowed.append("confidential")
+            if "admin" in self.user.roles:
+                allowed.append("secret")
         return allowed
 
     async def _can_access(self, sensitivity: str) -> bool:
-        return sensitivity in self._allowed_sensitivities()
+        return sensitivity in await self._allowed_sensitivities()
 
     async def _can_write(self, sensitivity: str) -> bool:
-        if "admin" in self.user.roles:
-            return True
-        if "hr" in self.user.roles and sensitivity in ("public", "internal", "confidential"):
-            return True
-        if sensitivity == "public":
-            return True
+        if await check_permission(self.user.roles, "wiki", "write"):
+            if "admin" in self.user.roles:
+                return True
+            if "hr" in self.user.roles and sensitivity in ("public", "internal", "confidential"):
+                return True
+            if sensitivity == "public":
+                return True
         return False

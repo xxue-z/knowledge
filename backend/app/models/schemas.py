@@ -166,3 +166,16 @@ class PaginatedResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# ---- RBAC Policy ----
+
+class PolicyCreate(BaseModel):
+    sub: str = Field(..., description="Subject (role)")
+    obj: str = Field(..., description="Object (resource)")
+    act: str = Field(..., description="Action")
+
+
+class RoleAssign(BaseModel):
+    user: str = Field(..., description="User ID")
+    role: str = Field(..., description="Role to assign")

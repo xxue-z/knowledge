@@ -38,6 +38,11 @@ const routes = [
         component: () => import('@/views/admin/Settings.vue'),
         meta: { requiresAdmin: true },
       },
+      {
+        path: 'trace',
+        name: 'Trace',
+        component: () => import('@/views/Trace.vue'),
+      },
     ],
   },
   {

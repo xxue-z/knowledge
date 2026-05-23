@@ -4,13 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.schemas import UserContext
 from app.services.llm_service import LLMService
-from app.services.db_service import DBService
-from app.services.vector_service import VectorService
 from app.agents.coordinator import CoordinatorAgent
 
 logger = logging.getLogger(__name__)
 
-# 意图分类关键词
 DB_KEYWORDS = [
     "员工", "人员", "部门", "工号", "入职", "在职", "离职",
     "项目", "负责", "参与", "成员", "负责人",
@@ -41,15 +38,16 @@ SQL_INJECTION_PATTERNS = [
 
 
 class RouterAgent:
+    """路由 Agent - 请求入口，负责意图分类和路由分发"""
+    
     def __init__(self, db: AsyncSession, user: UserContext):
         self.db = db
         self.user = user
         self.llm = LLMService()
         self.coordinator = CoordinatorAgent(db, user)
-
+    
     async def route(self, question: str) -> dict:
         """路由用户问题到正确的处理流程"""
-        # 1. SQL 注入检测
         if self._detect_sql_injection(question):
             return {
                 "answer": "检测到潜在的 SQL 注入攻击，已拦截。",
@@ -58,21 +56,19 @@ class RouterAgent:
                 "confidence": 1.0,
             }
 
-        # 2. 意图分类
         intent_result = await self._classify_intent(question)
         intent = intent_result["intent"]
         confidence = intent_result["confidence"]
 
         logger.info(f"Question: {question}, Intent: {intent}, Confidence: {confidence}")
 
-        # 3. 根据意图路由
         if intent == "PURE_DB":
             result = await self.coordinator.handle_db_query(question, intent_result)
         elif intent == "PURE_KB":
             result = await self.coordinator.handle_kb_query(question, intent_result)
         elif intent == "HYBRID":
             result = await self.coordinator.handle_hybrid_query(question, intent_result)
-        else:  # BOUNDARY
+        else:
             result = {
                 "answer": "抱歉，我无法理解您的问题或该问题超出了我的知识范围。请尝试重新描述您的问题。",
                 "sources": [],
@@ -93,18 +89,15 @@ class RouterAgent:
 
     async def _classify_intent(self, question: str) -> dict:
         """意图分类（先用关键词，再用 LLM 增强）"""
-        # 关键词匹配
         db_score = sum(1 for kw in DB_KEYWORDS if kw in question)
         kb_score = sum(1 for kw in KB_KEYWORDS if kw in question)
 
-        # 特殊规则
         if any(kw in question for kw in ["晋升", "升级"]) and any(kw in question for kw in ["条件", "符合", "要求"]):
             return {"intent": "HYBRID", "confidence": 0.9, "entities": {}, "keywords": []}
 
         if any(kw in question for kw in ["迟到", "早退"]) and any(kw in question for kw in ["扣钱", "罚款", "处罚"]):
             return {"intent": "HYBRID", "confidence": 0.9, "entities": {}, "keywords": []}
 
-        # 根据关键词得分分类
         if db_score > 0 and kb_score == 0:
             return {"intent": "PURE_DB", "confidence": min(0.5 + db_score * 0.1, 0.95), "entities": {}, "keywords": []}
         elif kb_score > 0 and db_score == 0:
@@ -112,10 +105,13 @@ class RouterAgent:
         elif db_score > 0 and kb_score > 0:
             return {"intent": "HYBRID", "confidence": 0.7, "entities": {}, "keywords": []}
 
-        # 关键词不明确时使用 LLM
         try:
             llm_result = await self.llm.classify_intent(question)
             return llm_result
         except Exception as e:
             logger.warning(f"LLM classification failed: {e}")
             return {"intent": "BOUNDARY", "confidence": 0.3, "entities": {}, "keywords": []}
+    
+    async def list_available_agents(self) -> list:
+        """获取所有可用的 Agent"""
+        return await self.coordinator.list_agents()
