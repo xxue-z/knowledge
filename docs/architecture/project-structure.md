@@ -1,6 +1,6 @@
 # 项目结构文档（Wiki）
 
-> 最后更新：2026-05-20
+> 最后更新：2026-05-23
 > 本文档供 Claude Code 快速了解项目全貌，避免每次扫描整个代码库。
 
 ---
@@ -34,19 +34,23 @@ knowledge-platform/
 | `knowledge.py` | `/api/knowledge` | 知识导航树 CRUD + 内容关联 |
 | `admin.py` | `/api/admin` | 审计日志/用户列表/权限策略（大部分 TODO） |
 | `system.py` | `/api/system` | 系统配置/连接测试/初始化 |
+| `trace.py` | `/api/trace` | 可观测性追踪 API |
 
 ### Agent 层 (`agents/`)
-| 文件 | Agent | 状态 | 职责 |
+
+Agent 已重构为包结构，每个 Agent 包含 `__init__.py` 和 `agent.py`：
+
+| 目录 | Agent | 状态 | 职责 |
 |------|-------|------|------|
-| `router.py` | RouterAgent | ✅ | 意图分类 + SQL 注入检测 + 路由分发 |
-| `coordinator.py` | CoordinatorAgent | ⚠️ | 任务编排（DB查询可用，KB/混合查询 TODO） |
-| `permission.py` | PermissionAgent | ⚠️ | RBAC 鉴权 + 敏感字段脱敏 |
-| `wiki_agent.py` | WikiAgent | ✅ | Wiki 搜索 + 内容获取 |
-| `vector.py` | VectorAgent | ✅ | 语义搜索 + 向量存储（含权限过滤） |
-| `db_agent.py` | DBAgent | ✅ | 员工查询 + 统计 |
-| `navigation.py` | NavigationAgent | ✅ | 关键词 + LLM 分类 |
-| `review.py` | ReviewAgent | ✅ | 敏感词检查 + MD 格式修正 |
-| `mindmap.py` | MindMapAgent | ✅ | 思维导图 JSON/Mermaid 生成 |
+| `router/` | RouterAgent | ✅ | 意图分类 + SQL 注入检测 + 路由分发 |
+| `coordinator/` | CoordinatorAgent | ⚠️ | 任务编排（DB查询可用，KB/混合查询 TODO） |
+| `permission_agent/` | PermissionAgent | ⚠️ | RBAC 鉴权 + 敏感字段脱敏 |
+| `wiki_agent/` | WikiAgent | ✅ | Wiki 搜索 + 内容获取 |
+| `vector_agent/` | VectorAgent | ✅ | 语义搜索 + 向量存储（含权限过滤） |
+| `db_agent/` | DBAgent | ✅ | 员工查询 + 统计 |
+| `navigation/` | NavigationAgent | ✅ | 关键词 + LLM 分类 |
+| `content_analysis_agent/` | ContentAnalysisAgent | ✅ | 内容分析处理 |
+| `mindmap_agent/` | MindMapAgent | ✅ | 思维导图 JSON/Mermaid 生成 |
 
 ### Service 层 (`services/`)
 | 文件 | 用途 |
@@ -58,6 +62,7 @@ knowledge-platform/
 | `llm_service.py` | LLM 多提供商架构（chat/embed/classify_intent） |
 | `config_service.py` | 配置管理（环境变量 > 数据库 > 默认值）+ CONFIG_SCHEMA |
 | `cache_service.py` | Redis 缓存封装 |
+| `trace_service.py` | 分布式追踪服务 |
 | `encryption.py` | Fernet 加密/解密（敏感配置字段） |
 
 ### LLM 提供商 (`services/llm_providers/`)
@@ -69,6 +74,23 @@ knowledge-platform/
 | `zhipu_provider.py` | 智谱 AI | ✅ |
 | `ollama_provider.py` | Ollama 本地 | ❌ |
 | `__init__.py` | ProviderRegistry 注册表 | - |
+
+### Skills 模块 (`skills/`)
+| 文件/目录 | 用途 |
+|-----------|------|
+| `__init__.py` | Skills 注册与加载 |
+| `registry.py` | 技能注册表 |
+| `init.py` | 技能初始化 |
+| `content_classifier/` | 内容分类技能 |
+| `intent_classifier/` | 意图分类技能 |
+| `mermaid_renderer/` | Mermaid 图表渲染 |
+
+### MCP 协议 (`mcps/`)
+| 文件/目录 | 用途 |
+|-----------|------|
+| `__init__.py` | MCP 模块导出 |
+| `mcp_protocol/` | MCP 协议实现 |
+| `registry/` | MCP 服务注册 |
 
 ### 数据模型 (`models/`)
 | 文件 | 表/模型 | 说明 |
@@ -91,6 +113,14 @@ knowledge-platform/
 | `middleware.py` | 审计日志中间件 |
 | `encryption.py` | Fernet 加密/解密 |
 | `logging.py` | 日志配置（文件 + 控制台） |
+| `events.py` | 事件处理系统 |
+| `trace.py` | 追踪核心模块 |
+
+### 中间件 (`middleware/`)
+| 文件 | 用途 |
+|------|------|
+| `__init__.py` | 中间件导出 |
+| `trace_middleware.py` | 追踪中间件 |
 
 ### 数据库 (`db/`)
 | 文件 | 用途 |
@@ -121,6 +151,7 @@ knowledge-platform/
 | `qa.js` | `/api/qa/ask` |
 | `knowledge.js` | `/api/knowledge/nav` CRUD |
 | `system.js` | `/api/system` 配置 + 测试 + 初始化 |
+| `trace.js` | `/api/trace` 追踪 API |
 
 ### 状态管理 (`stores/`)
 | 文件 | 用途 |
@@ -136,6 +167,7 @@ knowledge-platform/
 | `Wiki.vue` | Wiki 文档（编辑器+预览+编辑删除） | ✅ |
 | `QA.vue` | 智能问答 | ⚠️ 需对接实际向量搜索 |
 | `Knowledge.vue` | 知识导航 | ✅ |
+| `Trace.vue` | 追踪观测 | ✅ |
 | `layout/MainLayout.vue` | 主布局（侧边栏+顶栏+语言切换） | ✅ |
 | `setup/SetupLayout.vue` | 初始化向导（5步） | ✅ |
 | `admin/Settings.vue` | 系统设置（6 Tab） | ✅ |
@@ -157,6 +189,66 @@ knowledge-platform/
 |------|------|
 | `docker-compose.yml` | PostgreSQL 15 + Milvus + Etcd + MinIO + Keycloak + Redis |
 | `init-db.sql` | 数据库初始化（表结构 + ltree 扩展 + 预设数据） |
+
+---
+
+## 功能结构说明
+
+### 核心功能模块
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    知识平台功能架构                          │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    │
+│  │  认证授权    │    │  知识管理    │    │  智能问答    │    │
+│  │  Auth       │    │  Wiki       │    │  QA         │    │
+│  │  ├─ JWT     │    │  ├─ CRUD    │    │  ├─ 意图识别 │    │
+│  │  ├─ RBAC    │    │  ├─ 版本    │    │  ├─ 语义搜索 │    │
+│  │  └─ Casbin  │    │  ├─ 搜索    │    │  ├─ DB查询   │    │
+│  └─────────────┘    │  └─ ACL     │    │  └─ 结果聚合 │    │
+│                     └─────────────┘    └─────────────┘    │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    │
+│  │  知识导航    │    │  员工档案    │    │  系统管理    │    │
+│  │  Nav        │    │  Employee   │    │  System     │    │
+│  │  ├─ 树结构  │    │  ├─ 查询    │    │  ├─ 配置     │    │
+│  │  ├─ 分类    │    │  ├─ 统计    │    │  ├─ 审计     │    │
+│  │  └─ 关联    │    │  └─ 脱敏    │    │  └─ 追踪     │    │
+│  └─────────────┘    └─────────────┘    └─────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Agent 协作架构
+
+| Agent | 角色 | 职责说明 |
+|-------|------|----------|
+| **RouterAgent** | 入口路由 | 接收用户请求，进行意图分类和安全检测，分发到对应 Agent |
+| **CoordinatorAgent** | 任务编排 | 处理复杂任务，协调多个 Agent 协作，聚合结果 |
+| **PermissionAgent** | 权限管控 | 校验 RBAC 权限，控制数据可见范围，敏感字段脱敏 |
+| **WikiAgent** | 知识库 | 搜索和获取 Wiki 文档内容 |
+| **VectorAgent** | 向量搜索 | 语义相似度搜索，支持权限过滤 |
+| **DBAgent** | 数据库查询 | 员工档案查询，参数化 SQL 执行 |
+| **NavigationAgent** | 知识导航 | 关键词分类，导航树操作 |
+| **ContentAnalysisAgent** | 内容分析 | 内容处理和分析 |
+| **MindMapAgent** | 思维导图 | 生成思维导图 JSON 和 Mermaid 图表 |
+
+### Skills 技能模块
+
+| Skill | 功能 | 使用场景 |
+|-------|------|----------|
+| **ContentClassifier** | 内容分类 | Wiki 文档自动分类 |
+| **IntentClassifier** | 意图识别 | 用户提问意图判断 |
+| **MermaidRenderer** | 图表渲染 | 思维导图可视化 |
+
+### 可观测性模块
+
+| 组件 | 功能 |
+|------|------|
+| **TraceMiddleware** | 请求追踪中间件 |
+| **TraceService** | 追踪服务 |
+| **Events** | 事件处理系统 |
+| **TraceAPI** | 追踪查询接口 |
+| **TraceView** | 追踪可视化页面 |
 
 ---
 
