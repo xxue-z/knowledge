@@ -33,6 +33,11 @@ const routes = [
         component: () => import('@/views/Knowledge.vue'),
       },
       {
+        path: 'heatmap',
+        name: 'Heatmap',
+        component: () => import('@/views/Heatmap.vue'),
+      },
+      {
         path: 'admin/settings',
         name: 'Settings',
         component: () => import('@/views/admin/Settings.vue'),
