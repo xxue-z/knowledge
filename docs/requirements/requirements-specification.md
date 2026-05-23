@@ -130,6 +130,10 @@ graph TD
 | **子功能级** | 敏感字段脱敏 | 根据角色隐藏敏感数据 | 系统内部 | ⚠️ |
 | **子功能级** | 自动分类推荐 | 文档提交时推荐类别 | 系统内部 | ✅ |
 | **子功能级** | 敏感词检测 | 检测不当内容 | 系统内部 | ✅ |
+| **概要级别** | 查看热力图 | 发现热门知识和检索趋势 | 所有用户 | ✅ |
+| **用户目标级** | 查看热门榜单 | 浏览热门查询词和文档 | 所有用户 | ✅ |
+| **用户目标级** | 查看时间热力图 | 了解不同时段检索热度 | 所有用户 | ✅ |
+| **用户目标级** | 查看导航热度 | 发现知识导航热点节点 | 所有用户 | ✅ |
 
 ---
 
@@ -201,6 +205,17 @@ graph TD
 - [FR-SYSTEM-003: 连接测试](detailed/FR-SYSTEM.md) ✅
 - [FR-SYSTEM-004: 审计日志查询](detailed/FR-SYSTEM.md) ⚠️
 - [FR-SYSTEM-005: 热重载](detailed/FR-SYSTEM.md) ⚠️
+
+#### 4.1.12 热力图模块（FR-HEATMAP）
+- [FR-HEATMAP-001: 检索事件埋点](detailed/FR-HEATMAP.md) ⚠️
+- [FR-HEATMAP-002: 热门查询词榜单](detailed/FR-HEATMAP.md) ✅
+- [FR-HEATMAP-003: 热门文档榜单](detailed/FR-HEATMAP.md) ✅
+- [FR-HEATMAP-004: 时间热力图展示](detailed/FR-HEATMAP.md) ✅
+- [FR-HEATMAP-005: 知识导航热度标记](detailed/FR-HEATMAP.md) ✅
+- [FR-HEATMAP-006: Dashboard热门推荐入口](detailed/FR-HEATMAP.md) ✅
+- [FR-HEATMAP-007: 热度数据聚合后台任务](detailed/FR-HEATMAP.md) ⚠️
+- [FR-HEATMAP-008: 热力图多语言支持](detailed/FR-HEATMAP.md) ✅
+- [FR-HEATMAP-009: 热力图响应式设计](detailed/FR-HEATMAP.md) ✅
 
 ### 4.2 非功能需求
 #### 4.2.1 性能需求（NFR-PERF）
@@ -289,6 +304,10 @@ graph TD
 | 可视化输出 | Mermaid转换 | FR-MINDMAP-002 | 思维导图Agent | mermaid-renderer | ✅ |
 | 系统管理 | 初始化向导 | FR-SYSTEM-001 | 系统服务 | - | ✅ |
 | 系统管理 | 审计日志 | FR-SYSTEM-004 | 系统服务 | - | ⚠️ |
+| 知识发现 | 查看热力图 | FR-HEATMAP-004 | 热力图服务 | - | ✅ |
+| 知识发现 | 查看热门榜单 | FR-HEATMAP-002, FR-HEATMAP-003 | 热力图服务 | - | ✅ |
+| 知识发现 | 查看导航热度 | FR-HEATMAP-005 | 热力图服务 | - | ✅ |
+| 数据埋点 | 检索事件记录 | FR-HEATMAP-001 | 检索服务层 | - | ⚠️ |
 
 ### 6.2 Agent与Skill关系矩阵
 
@@ -301,6 +320,7 @@ graph TD
 | **内容分析Agent** | 敏感词过滤、格式优化、自动分类、导航节点管理 | content-classifier | ✅ |
 | **思维导图Agent** | 导图生成、知识整合 | mermaid-renderer | ✅ |
 | **协调Agent** | 复合任务分解、跨库查询、结果聚合 | - | - |
+| **热力图服务** | 检索埋点、热度统计、热门榜单、时间热力图 | - | ✅ |
 
 ### 6.3 Skill能力清单
 
@@ -337,7 +357,8 @@ graph TD
 | **思维导图Agent** | 导图生成、知识整合 | 3 | 2 | 0 | 1 | 67% |
 | **协调Agent** | 复合任务分解、跨库查询、结果聚合 | 4 | 0 | 1 | 3 | 12.5% |
 | **系统服务** | 认证、配置、审计日志 | 9 | 7 | 1 | 1 | 78% |
-| **Agent层总计** | - | **43** | **29** | **5** | **9** | **~67%** |
+| **热力图服务** | 检索埋点、热度统计、热门榜单、时间热力图 | 9 | 6 | 2 | 1 | 67% |
+| **Agent层总计** | - | **52** | **35** | **7** | **10** | **~67%** |
 
 #### 可复用Skill层
 | Skill | 能力 | 状态 |
@@ -354,6 +375,16 @@ graph TD
 
 ---
 
-**文档版本**: v1.1
+### 7.3 新增需求说明
+- **新增模块**: 热力图模块（FR-HEATMAP），包含9个功能需求
+- **新增文档**: 
+  - [2026-05-23-heatmap-design.md](file:///d:/Project/Claude/knowledge/docs/superpowers/specs/2026-05-23-heatmap-design.md) - 后端设计文档
+  - [2026-05-23-heatmap-frontend-design.md](file:///d:/Project/Claude/knowledge/docs/superpowers/specs/2026-05-23-heatmap-frontend-design.md) - 前端设计文档
+- **已实现功能**: 前端热力图页面、Dashboard入口、API接口
+- **待实现功能**: 检索事件埋点、后台聚合任务
+
+---
+
+**文档版本**: v1.2
 **更新日期**: 2026-05-23
 **状态**: 已审核
