@@ -9,7 +9,7 @@ from app.config import get_settings
 from app.core.logging import setup_logging
 from app.core.trace import setup_trace_logging
 from app.middleware import TraceMiddleware
-from app.api import auth, wiki, qa, knowledge, admin, system
+from app.api import auth, wiki, qa, knowledge, admin, system, heatmap
 
 settings = get_settings()
 setup_logging(log_dir="logs", level="DEBUG" if settings.DEBUG else "INFO")
@@ -172,6 +172,7 @@ app.include_router(qa.router, prefix="/api/qa", tags=["问答"])
 app.include_router(knowledge.router, prefix="/api/knowledge", tags=["知识导航"])
 app.include_router(admin.router, prefix="/api/admin", tags=["管理"])
 app.include_router(system.router, prefix="/api/system", tags=["系统配置"])
+app.include_router(heatmap.router, tags=["热力图"])
 
 
 @app.get("/health")
