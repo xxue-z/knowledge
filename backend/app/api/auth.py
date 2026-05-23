@@ -4,18 +4,14 @@ from urllib.parse import urlencode
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import (
     create_local_token,
     get_current_active_user,
-    hash_password,
-    verify_password,
     verify_keycloak_token,
 )
-from app.dal import get_db, LocalUserRepository
 from app.models.schemas import UserContext
+from app.server import get_auth_server, AuthServer
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -61,23 +57,19 @@ async def login(data: LoginRequest):
             raise HTTPException(status_code=403, detail="内置管理员已停用，请使用您创建的管理员账号登录")
 
     try:
-        from app.models.local_user import LocalUser
+        from app.dal import get_adapter
+        from app.dal.repositories import LocalUserRepository
+        server = AuthServer(LocalUserRepository(get_adapter()))
         
-        adapter = __import__('app.dal', fromlist=['get_adapter']).get_adapter()
-        user_repo = LocalUserRepository(adapter)
-        user = await user_repo.get_by_username(data.username)
+        result = await server.authenticate(data.username, data.password)
+        
+        if not result["success"]:
+            raise HTTPException(status_code=401, detail=result["error"])
 
-        if not user or not verify_password(data.password, user.password_hash):
-            raise HTTPException(status_code=401, detail="用户名或密码错误")
-
-        if not user.is_active:
-            raise HTTPException(status_code=403, detail="账号已被禁用")
-
-        return create_local_token(
-            user_id=str(user.id),
-            username=user.username,
-            roles=user.roles or ["employee"],
-            dept_id=user.dept_id,
+        return TokenResponse(
+            access_token=result["access_token"],
+            token_type=result["token_type"],
+            expires_in=result["expires_in"],
         )
     except HTTPException:
         raise
@@ -87,14 +79,12 @@ async def login(data: LoginRequest):
 
 
 @router.get("/me", response_model=UserInfoResponse)
-async def get_user_info(current_user: UserContext = Depends(get_current_active_user)):
-    return UserInfoResponse(
-        user_id=current_user.user_id,
-        username=current_user.username,
-        email=current_user.email,
-        roles=current_user.roles,
-        dept_id=current_user.dept_id,
-    )
+async def get_user_info(
+    server: AuthServer = Depends(get_auth_server),
+    current_user: UserContext = Depends(get_current_active_user),
+):
+    result = await server.get_user_info(current_user)
+    return UserInfoResponse(**result)
 
 
 @router.post("/logout")
@@ -110,31 +100,13 @@ class ChangePasswordRequest(BaseModel):
 @router.post("/change-password")
 async def change_password(
     data: ChangePasswordRequest,
+    server: AuthServer = Depends(get_auth_server),
     current_user: UserContext = Depends(get_current_active_user),
 ):
-    from app.models.local_user import LocalUser
-    from app.dal import get_adapter
-
-    if len(data.new_password) < 6:
-        raise HTTPException(status_code=400, detail="新密码至少 6 位")
-
-    if current_user.user_id == "builtin-admin":
-        raise HTTPException(status_code=400, detail="内置管理员不支持修改密码，请先完成系统初始化")
-
-    adapter = get_adapter()
-    user_repo = LocalUserRepository(adapter)
-    user = await user_repo.get_by_id(int(current_user.user_id))
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
-
-    if not verify_password(data.old_password, user.password_hash):
-        raise HTTPException(status_code=400, detail="原密码错误")
-
-    user.password_hash = hash_password(data.new_password)
-    await user_repo.update(user)
-    logger.info(f"User {user.username} changed password")
-    return {"message": "密码修改成功"}
+    result = await server.change_password(current_user.user_id, data.old_password, data.new_password)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return {"message": result["message"]}
 
 
 class KeycloakLoginResponse(BaseModel):
@@ -182,8 +154,8 @@ async def keycloak_callback(data: KeycloakCallbackRequest):
     用授权码换取 Keycloak token，然后生成本地 token 返回
     """
     from app.config import get_settings
-    from app.models.local_user import LocalUser
     from app.dal import get_adapter
+    from app.dal.repositories import LocalUserRepository
     settings = get_settings()
 
     if not settings.KEYCLOAK_SERVER_URL:
@@ -221,25 +193,15 @@ async def keycloak_callback(data: KeycloakCallbackRequest):
             if not user_context:
                 raise HTTPException(status_code=401, detail="Keycloak token 验证失败")
 
-            adapter = get_adapter()
-            user_repo = LocalUserRepository(adapter)
-            local_user = await user_repo.get_by_username(user_context.username)
-
-            if local_user:
-                user_id = str(local_user.id)
-                roles = local_user.roles or user_context.roles
-                dept_id = local_user.dept_id or user_context.dept_id
-            else:
-                user_id = user_context.user_id
-                roles = user_context.roles or ["employee"]
-                dept_id = user_context.dept_id
+            server = AuthServer(LocalUserRepository(get_adapter()))
+            result = await server.keycloak_callback(user_context.username)
 
             logger.info(f"Keycloak login success for user: {user_context.username}")
             return create_local_token(
-                user_id=user_id,
+                user_id=result["user_id"],
                 username=user_context.username,
-                roles=roles,
-                dept_id=dept_id,
+                roles=result["roles"],
+                dept_id=result["dept_id"],
             )
 
     except httpx.HTTPError as e:

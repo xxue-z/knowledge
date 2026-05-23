@@ -332,6 +332,13 @@ class HeatmapStatsRepository(ModelRepository):
         super().__init__(adapter, HeatmapStats)
         self.HeatmapStats = HeatmapStats
 
+    async def get_by_type(self, stat_type: str) -> List[Any]:
+        async with await self._get_session() as session:
+            result = await session.execute(
+                select(self.HeatmapStats).where(self.HeatmapStats.stat_type == stat_type)
+            )
+            return result.scalars().all()
+
     async def get_by_type_and_date(self, stat_type: str, stat_date: datetime.date) -> List[Any]:
         async with await self._get_session() as session:
             result = await session.execute(
