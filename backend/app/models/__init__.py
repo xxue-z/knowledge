@@ -6,6 +6,7 @@ from app.models.audit import AuditLog
 from app.models.casbin import CasbinRule
 from app.models.system_config import SystemConfig
 from app.models.local_user import LocalUser
+from app.models.heatmap import SearchEvent, HeatmapStats
 
 __all__ = [
     "WikiPage",
@@ -18,4 +19,6 @@ __all__ = [
     "CasbinRule",
     "SystemConfig",
     "LocalUser",
+    "SearchEvent",
+    "HeatmapStats",
 ]
