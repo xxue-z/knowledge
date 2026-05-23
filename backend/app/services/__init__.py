@@ -19,6 +19,9 @@ from .admin_service import AdminService
 from .qa_service import QAService
 from .storage_service import StorageService
 from .config_service import ConfigService
+from .tags_service import TagsService
+from .chunking_service import ChunkingService
+from .document_processor_service import DocumentProcessorService
 
 
 @lru_cache()
