@@ -43,10 +43,21 @@ async def login(data: LoginRequest):
     - 系统未初始化时 -> 内置管理员直接登录（无需数据库）
     - 系统已初始化后 -> 内置管理员失效，走数据库验证
     """
-    from app.main import BUILTIN_ADMIN_PASS, BUILTIN_ADMIN_USER, SYSTEM_INITIALIZED
+    from app.main import BUILTIN_ADMIN_PASS, BUILTIN_ADMIN_USER
+    from app.dal import get_adapter
+    from app.dal.repositories import LocalUserRepository
 
     if data.username == BUILTIN_ADMIN_USER and data.password == BUILTIN_ADMIN_PASS:
-        if not SYSTEM_INITIALIZED:
+        adapter = get_adapter()
+        user_repo = LocalUserRepository(adapter)
+        users = await user_repo.get_all()
+        
+        has_non_builtin_admin = any(
+            "admin" in u.roles and u.username != BUILTIN_ADMIN_USER 
+            for u in users
+        )
+        
+        if not has_non_builtin_admin:
             logger.info("Built-in admin login (system not initialized)")
             return create_local_token(
                 user_id="builtin-admin",

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import i18n from '@/i18n'
 
 const request = axios.create({
   baseURL: '/api',
@@ -24,28 +25,27 @@ request.interceptors.response.use(
   (error) => {
     const status = error.response?.status
     const detail = error.response?.data?.detail || error.response?.data?.message
-    
-    let message = detail || error.message || '请求失败'
-    
-    if (status === 401) {
+
+    // 根据错误消息进行特殊处理
+    if (detail === '内置管理员已停用，请使用您创建的管理员账号登录' ||
+        detail === 'Built-in admin is disabled, please use the admin account you created') {
+      ElMessage.warning(i18n.global.t('login.builtinDisabled'))
+    } else if (status === 401) {
       localStorage.removeItem('token')
-      ElMessage.warning('登录已过期，请重新登录')
+      ElMessage.warning(i18n.global.t('login.sessionExpired'))
       setTimeout(() => {
         window.location.href = '/login'
       }, 1500)
     } else if (status === 403) {
-      message = detail || '您没有权限执行此操作'
-      ElMessage.warning(message)
+      ElMessage.warning(detail || i18n.global.t('common.msg.noPermission'))
     } else if (status === 404) {
-      message = detail || '资源未找到'
-      ElMessage.error(message)
+      ElMessage.error(detail || i18n.global.t('common.msg.notFound'))
     } else if (status === 500) {
-      message = '服务器内部错误，请稍后重试'
-      ElMessage.error(message)
+      ElMessage.error(i18n.global.t('common.msg.serverError'))
     } else {
-      ElMessage.error(message)
+      ElMessage.error(detail || i18n.global.t('common.msg.requestFailed'))
     }
-    
+
     return Promise.reject(error)
   }
 )

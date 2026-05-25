@@ -31,7 +31,7 @@ async def check_system_initialized():
         
         users = await user_repo.get_all()
         for user in users:
-            if "admin" in user.roles:
+            if "admin" in user.roles and user.username != BUILTIN_ADMIN_USER:
                 SYSTEM_INITIALIZED = True
                 logger.info("System is initialized (admin user found)")
                 return
@@ -61,31 +61,6 @@ async def init_agents():
     register_mindmap_agent()
 
 
-async def ensure_default_admin():
-    try:
-        adapter = get_adapter()
-        user_repo = LocalUserRepository(adapter)
-        
-        existing = await user_repo.get_by_username(BUILTIN_ADMIN_USER)
-        if existing:
-            return
-
-        from app.models.local_user import LocalUser
-        from app.core.security import hash_password
-
-        admin_user = LocalUser(
-            username=BUILTIN_ADMIN_USER,
-            password_hash=hash_password(BUILTIN_ADMIN_PASS),
-            email="admin@local",
-            roles=["admin"],
-            is_active=True,
-        )
-        await user_repo.create(admin_user)
-        logger.info("Default admin user created")
-    except Exception as e:
-        logger.warning(f"Database not available, skipping admin creation: {e}")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global SYSTEM_INITIALIZED
@@ -95,10 +70,6 @@ async def lifespan(app: FastAPI):
     logger.info("Database adapter connected")
 
     await check_system_initialized()
-
-    if not SYSTEM_INITIALIZED:
-        await ensure_default_admin()
-        await check_system_initialized()
 
     try:
         from app.core.casbin_policy import init_policies

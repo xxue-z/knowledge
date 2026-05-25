@@ -97,8 +97,18 @@ class FetchModelsRequest(BaseModel):
 
 @router.get("/status", response_model=SystemStatusResponse)
 async def get_system_status():
-    from app.main import SYSTEM_INITIALIZED
-    return SystemStatusResponse(initialized=SYSTEM_INITIALIZED, version="0.1.0")
+    from app.main import BUILTIN_ADMIN_USER
+    from app.dal import get_adapter
+    from app.dal.repositories import LocalUserRepository
+    
+    adapter = get_adapter()
+    user_repo = LocalUserRepository(adapter)
+    users = await user_repo.get_all()
+    
+    admin_users = [u for u in users if "admin" in u.roles and u.username != BUILTIN_ADMIN_USER]
+    initialized = len(admin_users) > 0
+    
+    return SystemStatusResponse(initialized=initialized, version="0.1.0")
 
 
 @router.get("/config/schema")
