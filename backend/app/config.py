@@ -66,8 +66,8 @@ class Settings(BaseSettings):
     BUILTIN_ADMIN_PASS: str = "admin123"
 
     # Signature Validation
-    SIGNATURE_ENABLED: bool = False
-    SIGNATURE_SECRET_KEY: str = ""
+    SIGNATURE_ENABLED: bool = True
+    SIGNATURE_SECRET_KEY: str = "knowledge-platform-default-signature-secret-change-in-production"
     SIGNATURE_TIMESTAMP_TOLERANCE: int = 60
     SIGNATURE_EXCLUDED_PATHS: str = "/api/auth/token,/health,/api/system/status"
 

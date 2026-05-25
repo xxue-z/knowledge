@@ -8,7 +8,7 @@ const request = axios.create({
   timeout: 30000,
 })
 
-const SIGNATURE_SECRET = import.meta.env.VITE_SIGNATURE_SECRET || ''
+const SIGNATURE_SECRET = import.meta.env.VITE_SIGNATURE_SECRET || 'knowledge-platform-default-signature-secret-change-in-production'
 
 // 请求拦截器
 request.interceptors.request.use(
