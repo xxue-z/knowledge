@@ -2,6 +2,7 @@ import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import i18n from '@/i18n'
 import { signRequest } from '@/utils/sign'
+import { getErrorCodeKey } from '@/utils/errorCodes'
 
 const request = axios.create({
   baseURL: '/api',
@@ -32,12 +33,28 @@ request.interceptors.response.use(
   (response) => response.data,
   (error) => {
     const status = error.response?.status
+    const errorCode = error.response?.data?.error_code
     const detail = error.response?.data?.detail || error.response?.data?.message
 
-    // 根据错误消息进行特殊处理
-    if (detail === '内置管理员已停用，请使用您创建的管理员账号登录' ||
-        detail === 'Built-in admin is disabled, please use the admin account you created') {
-      ElMessage.warning(i18n.global.t('login.builtinDisabled'))
+    if (errorCode) {
+      const errorKey = getErrorCodeKey(errorCode)
+      const errorMessage = i18n.global.t(errorKey)
+      
+      if (errorCode === '11001') {
+        ElMessage.warning(errorMessage)
+      } else if (errorCode === '11003') {
+        localStorage.removeItem('token')
+        ElMessage.warning(errorMessage)
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 1500)
+      } else if (status === 403) {
+        ElMessage.warning(errorMessage)
+      } else if (status === 404) {
+        ElMessage.error(errorMessage)
+      } else {
+        ElMessage.error(errorMessage)
+      }
     } else if (status === 401) {
       localStorage.removeItem('token')
       ElMessage.warning(i18n.global.t('login.sessionExpired'))

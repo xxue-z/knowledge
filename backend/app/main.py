@@ -10,6 +10,7 @@ from app.core.trace import setup_trace_logging
 from app.middleware import TraceMiddleware, SignatureMiddleware
 from app.api import auth, wiki, qa, knowledge, admin, system, heatmap, storage, tags, chunking_rules
 from app.dal import get_adapter, LocalUserRepository
+from app.core.exception_handler import custom_exception_handler
 
 settings = get_settings()
 setup_logging(log_dir="logs", level="DEBUG" if settings.DEBUG else "INFO")
@@ -147,6 +148,8 @@ app.add_middleware(
 
 app.add_middleware(TraceMiddleware)
 app.add_middleware(SignatureMiddleware)
+
+app.add_exception_handler(Exception, custom_exception_handler)
 
 app.include_router(auth.router, prefix="/api/auth", tags=["认证"])
 app.include_router(wiki.router, prefix="/api/wiki", tags=["Wiki"])

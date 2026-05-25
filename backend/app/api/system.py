@@ -1,13 +1,15 @@
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from app.dal import get_db, get_adapter, Base
 from app.core.security import get_current_active_user
+from app.core.exceptions import CustomException
+from app.core.error_codes import ErrorCode
 from app.models.schemas import UserContext
 from app.services.config_service import ConfigService
 from app.services.llm_providers import ProviderRegistry
@@ -122,7 +124,7 @@ async def get_all_configs(
     db: AsyncSession = Depends(get_db),
 ):
     if "admin" not in current_user.roles:
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise CustomException(ErrorCode.INSUFFICIENT_PERMISSIONS)
     service = ConfigService(db)
     return await service.get_all_categories(mask_sensitive=True)
 
@@ -134,7 +136,7 @@ async def get_category_config(
     db: AsyncSession = Depends(get_db),
 ):
     if "admin" not in current_user.roles:
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise CustomException(ErrorCode.INSUFFICIENT_PERMISSIONS)
     service = ConfigService(db)
     return await service.get_category(category, mask_sensitive=True)
 
@@ -147,7 +149,7 @@ async def update_category_config(
     db: AsyncSession = Depends(get_db),
 ):
     if "admin" not in current_user.roles:
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise CustomException(ErrorCode.INSUFFICIENT_PERMISSIONS)
     service = ConfigService(db)
     await service.set_batch(category, data.configs)
     await db.commit()
@@ -170,7 +172,7 @@ async def list_provider_models(provider_name: str):
     try:
         return ProviderRegistry.list_provider_models(provider_name)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise CustomException(ErrorCode.RESOURCE_NOT_FOUND, detail=str(e))
 
 
 @router.get("/llm/providers/{provider_name}/default-config")
@@ -178,7 +180,7 @@ async def get_provider_default_config(provider_name: str):
     try:
         return ProviderRegistry.get_provider_default_config(provider_name)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise CustomException(ErrorCode.RESOURCE_NOT_FOUND, detail=str(e))
 
 
 @router.post("/llm/fetch-models")
@@ -189,7 +191,7 @@ async def fetch_models_from_api(data: FetchModelsRequest):
     api_base = data.api_base.rstrip("/")
 
     if not api_key:
-        raise HTTPException(status_code=400, detail="API Key is required")
+        raise CustomException(ErrorCode.VALIDATION_ERROR, detail="API Key is required")
 
     models_url = f"{api_base}/models"
 
@@ -219,9 +221,9 @@ async def fetch_models_from_api(data: FetchModelsRequest):
         return {"models": models, "total": len(models)}
 
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=e.response.status_code, detail=f"API error: {e.response.text[:200]}")
+        raise CustomException(ErrorCode.LLM_SERVICE_UNAVAILABLE, detail=f"API error: {e.response.text[:200]}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch models: {str(e)}")
+        raise CustomException(ErrorCode.LLM_SERVICE_UNAVAILABLE, detail=f"Failed to fetch models: {str(e)}")
 
 
 def _assemble_db_url(db: dict[str, str]) -> str:
@@ -392,10 +394,10 @@ async def initialize_system(data: InitRequest):
     import app.main as main_module
 
     if main_module.SYSTEM_INITIALIZED:
-        raise HTTPException(status_code=400, detail="System is already initialized")
+        raise CustomException(ErrorCode.SYSTEM_ALREADY_INITIALIZED)
 
     if not data.admin_password or len(data.admin_password) < 6:
-        raise HTTPException(status_code=400, detail="管理员密码至少 6 位")
+        raise CustomException(ErrorCode.ADMIN_PASSWORD_TOO_SHORT)
 
     categories = {
         "database": data.database,
@@ -410,19 +412,19 @@ async def initialize_system(data: InitRequest):
         _write_env_file(categories)
     except Exception as e:
         logger.error(f"Failed to write .env: {e}")
-        raise HTTPException(status_code=500, detail=f"写入配置文件失败: {e}")
+        raise CustomException(ErrorCode.CONFIG_FILE_WRITE_FAILED, detail=str(e))
 
     try:
         await _create_tables()
     except Exception as e:
         logger.error(f"Failed to create tables: {e}")
-        raise HTTPException(status_code=500, detail=f"创建数据库表失败: {e}")
+        raise CustomException(ErrorCode.DB_TABLE_CREATE_FAILED, detail=str(e))
 
     try:
         await _seed_admin(data.admin_password)
     except Exception as e:
         logger.error(f"Failed to seed admin: {e}")
-        raise HTTPException(status_code=500, detail=f"创建管理员账号失败: {e}")
+        raise CustomException(ErrorCode.DB_TABLE_CREATE_FAILED, detail=str(e))
 
     main_module.SYSTEM_INITIALIZED = True
     logger.info("System initialized successfully")

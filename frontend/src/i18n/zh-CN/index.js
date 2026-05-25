@@ -8,5 +8,6 @@ import setup from './setup'
 import settings from './settings'
 import heatmap from './heatmap'
 import tags from './tags'
+import errors from './errors'
 
-export default { common, login, dashboard, wiki, qa, knowledge, setup, settings, heatmap, tags }
+export default { common, login, dashboard, wiki, qa, knowledge, setup, settings, heatmap, tags, errors }

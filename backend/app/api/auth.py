@@ -2,7 +2,7 @@ import logging
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.core.security import (
@@ -10,6 +10,8 @@ from app.core.security import (
     get_current_active_user,
     verify_keycloak_token,
 )
+from app.core.exceptions import CustomException
+from app.core.error_codes import ErrorCode
 from app.models.schemas import UserContext
 from app.services import get_auth_service, AuthService
 
@@ -65,7 +67,7 @@ async def login(data: LoginRequest):
                 roles=["admin"],
             )
         else:
-            raise HTTPException(status_code=403, detail="内置管理员已停用，请使用您创建的管理员账号登录")
+            raise CustomException(ErrorCode.BUILTIN_ADMIN_DISABLED)
 
     try:
         from app.dal import get_adapter
@@ -75,18 +77,18 @@ async def login(data: LoginRequest):
         result = await service.authenticate(data.username, data.password)
         
         if not result["success"]:
-            raise HTTPException(status_code=401, detail=result["error"])
+            raise CustomException(ErrorCode.INVALID_CREDENTIALS)
 
         return TokenResponse(
             access_token=result["access_token"],
             token_type=result["token_type"],
             expires_in=result["expires_in"],
         )
-    except HTTPException:
+    except CustomException:
         raise
     except Exception as e:
         logger.error(f"Login DB error: {e}")
-        raise HTTPException(status_code=503, detail="数据库不可用，请先完成系统初始化")
+        raise CustomException(ErrorCode.DB_CONNECTION_FAILED)
 
 
 @router.get("/me", response_model=UserInfoResponse)
@@ -116,7 +118,12 @@ async def change_password(
 ):
     result = await service.change_password(current_user.user_id, data.old_password, data.new_password)
     if not result["success"]:
-        raise HTTPException(status_code=400, detail=result["error"])
+        if result["error"] == "Old password incorrect":
+            raise CustomException(ErrorCode.OLD_PASSWORD_INCORRECT)
+        elif result["error"] == "New password too short":
+            raise CustomException(ErrorCode.NEW_PASSWORD_TOO_SHORT)
+        else:
+            raise CustomException(ErrorCode.VALIDATION_ERROR, detail=result["error"])
     return {"message": result["message"]}
 
 
@@ -134,7 +141,7 @@ async def keycloak_login():
     settings = get_settings()
 
     if not settings.KEYCLOAK_SERVER_URL:
-        raise HTTPException(status_code=503, detail="Keycloak 未配置")
+        raise CustomException(ErrorCode.KEYCLOAK_UNAVAILABLE)
 
     import secrets
     state = secrets.token_urlsafe(32)
@@ -170,7 +177,7 @@ async def keycloak_callback(data: KeycloakCallbackRequest):
     settings = get_settings()
 
     if not settings.KEYCLOAK_SERVER_URL:
-        raise HTTPException(status_code=503, detail="Keycloak 未配置")
+        raise CustomException(ErrorCode.KEYCLOAK_UNAVAILABLE)
 
     token_url = f"{settings.KEYCLOAK_SERVER_URL}/realms/{settings.KEYCLOAK_REALM}/protocol/openid-connect/token"
     redirect_uri = f"{settings.KEYCLOAK_SERVER_URL}/realms/{settings.KEYCLOAK_REALM}/protocol/openid-connect/auth"
@@ -192,17 +199,17 @@ async def keycloak_callback(data: KeycloakCallbackRequest):
 
             if token_response.status_code != 200:
                 logger.error(f"Keycloak token exchange failed: {token_response.text}")
-                raise HTTPException(status_code=401, detail="Keycloak 认证失败")
+                raise CustomException(ErrorCode.KEYCLOAK_AUTH_FAILED)
 
             token_data = token_response.json()
             keycloak_access_token = token_data.get("access_token")
 
             if not keycloak_access_token:
-                raise HTTPException(status_code=401, detail="Keycloak 未返回 access_token")
+                raise CustomException(ErrorCode.KEYCLOAK_AUTH_FAILED, detail="Keycloak did not return access_token")
 
             user_context = verify_keycloak_token(keycloak_access_token)
             if not user_context:
-                raise HTTPException(status_code=401, detail="Keycloak token 验证失败")
+                raise CustomException(ErrorCode.KEYCLOAK_AUTH_FAILED, detail="Keycloak token verification failed")
 
             service = AuthService(LocalUserRepository(get_adapter()))
             result = await service.keycloak_callback(user_context.username)
@@ -217,9 +224,9 @@ async def keycloak_callback(data: KeycloakCallbackRequest):
 
     except httpx.HTTPError as e:
         logger.error(f"Keycloak HTTP error: {e}")
-        raise HTTPException(status_code=503, detail="无法连接 Keycloak 服务器")
-    except HTTPException:
+        raise CustomException(ErrorCode.KEYCLOAK_UNAVAILABLE)
+    except CustomException:
         raise
     except Exception as e:
         logger.error(f"Keycloak callback error: {e}")
-        raise HTTPException(status_code=500, detail="Keycloak 登录处理失败")
+        raise CustomException(ErrorCode.KEYCLOAK_AUTH_FAILED)
