@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     BUILTIN_ADMIN_USER: str = "builtin-admin"
     BUILTIN_ADMIN_PASS: str = "admin123"
 
+    # Signature Validation
+    SIGNATURE_ENABLED: bool = False
+    SIGNATURE_SECRET_KEY: str = ""
+    SIGNATURE_TIMESTAMP_TOLERANCE: int = 60
+    SIGNATURE_EXCLUDED_PATHS: str = "/api/auth/token,/health,/api/system/status"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

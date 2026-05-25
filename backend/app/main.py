@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.core.logging import setup_logging
 from app.core.trace import setup_trace_logging
-from app.middleware import TraceMiddleware
+from app.middleware import TraceMiddleware, SignatureMiddleware
 from app.api import auth, wiki, qa, knowledge, admin, system, heatmap, storage, tags, chunking_rules
 from app.dal import get_adapter, LocalUserRepository
 
@@ -146,6 +146,7 @@ app.add_middleware(
 )
 
 app.add_middleware(TraceMiddleware)
+app.add_middleware(SignatureMiddleware)
 
 app.include_router(auth.router, prefix="/api/auth", tags=["认证"])
 app.include_router(wiki.router, prefix="/api/wiki", tags=["Wiki"])

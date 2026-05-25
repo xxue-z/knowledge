@@ -1,11 +1,14 @@
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import i18n from '@/i18n'
+import { signRequest } from '@/utils/sign'
 
 const request = axios.create({
   baseURL: '/api',
   timeout: 30000,
 })
+
+const SIGNATURE_SECRET = import.meta.env.VITE_SIGNATURE_SECRET || ''
 
 // 请求拦截器
 request.interceptors.request.use(
@@ -14,6 +17,11 @@ request.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    
+    if (SIGNATURE_SECRET) {
+      signRequest(config, SIGNATURE_SECRET)
+    }
+    
     return config
   },
   (error) => Promise.reject(error)
