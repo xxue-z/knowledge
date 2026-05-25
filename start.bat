@@ -12,7 +12,7 @@ echo ========================================
 echo.
 
 :: Check and install Python dependencies (with error tolerance)
-echo [1/4] Checking backend dependencies...
+echo [1/5] Checking backend dependencies...
 
 python -c "import fastapi" >nul 2>&1
 if errorlevel 1 (
@@ -64,14 +64,14 @@ if errorlevel 1 (
 
 :: Check if node_modules exists
 if not exist "%FRONTEND%\node_modules" (
-    echo [2/4] Installing frontend dependencies...
+    echo [2/5] Installing frontend dependencies...
     cd /d "%FRONTEND%" && npm install
 ) else (
-    echo [2/4] Frontend dependencies OK
+    echo [2/5] Frontend dependencies OK
 )
 
 :: Check if Docker containers are running
-echo [3/4] Checking infrastructure services...
+echo [3/5] Checking infrastructure services...
 docker ps --format "{{.Names}}" | findstr /C:"postgres" >nul
 if errorlevel 1 (
     echo   [WARNING] PostgreSQL container not running
@@ -84,20 +84,40 @@ if errorlevel 1 (
     echo   Start with: docker compose -f "%ROOT%infra\docker-compose.yml" up -d redis
 )
 
-echo [4/4] Starting services...
+echo [4/5] Starting backend...
 echo.
 
-:: Start backend in background (no new window)
+:: Start backend and wait for it to be ready
 cd /d "%BACKEND%"
 start "KP-Backend" /B cmd /c "uvicorn app.main:app --reload --port 8000 2>&1"
+
+:: Wait for backend to be ready (check health endpoint)
+echo   Waiting for backend to start...
+set "BACKEND_READY=0"
+for /L %%i in (1,1,30) do (
+    curl -s http://localhost:8000/docs >nul 2>&1
+    if not errorlevel 1 (
+        set "BACKEND_READY=1"
+        echo   Backend is ready!
+        goto :backend_ready
+    )
+    timeout /t 1 /nobreak >nul
+)
+
+:backend_ready
+if "!BACKEND_READY!" == "0" (
+    echo   [WARNING] Backend may not be ready, continuing anyway...
+)
+
+echo [5/5] Starting frontend...
 
 :: Start frontend in background (no new window)
 cd /d "%FRONTEND%"
 start "KP-Frontend" /B cmd /c "npm run dev 2>&1"
 
-:: Wait for services to be ready
-echo Waiting for services...
-timeout /t 4 /nobreak >nul
+:: Wait for frontend to be ready
+echo   Waiting for frontend to start...
+timeout /t 3 /nobreak >nul
 
 echo.
 echo ========================================
