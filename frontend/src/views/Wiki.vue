@@ -1,5 +1,80 @@
 <template>
   <div class="wiki-page fade-in">
+    <!-- 思维导图生成区域 -->
+    <div v-if="mindmapMode" class="mindmap-panel">
+      <div class="mindmap-header">
+        <h2>{{ t('wiki.mindmap.title') }}</h2>
+        <el-button @click="closeMindmap">{{ t('common.btn.close') }}</el-button>
+      </div>
+      <div class="mindmap-body">
+        <div class="mindmap-left">
+          <el-form label-position="top" class="mindmap-form">
+            <el-form-item :label="t('wiki.mindmap.contentLabel')">
+              <textarea 
+                v-model="mindmapContent" 
+                :placeholder="t('wiki.mindmap.contentPlaceholder')" 
+                :disabled="generating"
+                class="content-textarea"
+              />
+            </el-form-item>
+            <el-row :gutter="16">
+              <el-col :span="8">
+                <el-form-item :label="t('wiki.mindmap.format')">
+                  <el-select v-model="mindmapFormat" :disabled="generating">
+                    <el-option label="Mermaid" value="mermaid" />
+                    <el-option label="JSON" value="json" />
+                    <el-option label="Markdown" value="markdown" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item :label="t('wiki.mindmap.depth')">
+                  <el-input-number v-model="mindmapDepth" :min="1" :max="5" :disabled="generating" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item :label="t('wiki.mindmap.useNavigation')">
+                  <el-switch 
+                    v-model="useNavigation" 
+                    :disabled="generating"
+                  />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-form-item>
+              <div class="form-actions">
+                <el-button type="primary" :loading="generating" @click="generateMindmap">
+                  <el-icon><Sparkles /></el-icon>
+                  {{ t('wiki.mindmap.generateBtn') }}
+                </el-button>
+                <el-button @click="clearMindmap">{{ t('common.btn.clear') }}</el-button>
+              </div>
+            </el-form-item>
+          </el-form>
+        </div>
+        <div class="mindmap-right">
+          <div class="result-header">
+            <span>{{ t('wiki.mindmap.preview') }}</span>
+            <el-button 
+              v-if="mindmapResult" 
+              text size="small" 
+              @click="copyMindmap"
+            >
+              <el-icon><CopyDocument /></el-icon>
+              {{ t('common.btn.copy') }}
+            </el-button>
+          </div>
+          <div class="result-content" v-loading="generating">
+            <pre v-if="mindmapResult" class="mindmap-output">{{ mindmapResult }}</pre>
+            <div v-else class="empty-result">
+              <el-icon :size="48" color="#9CA3AF"><Sparkles /></el-icon>
+              <p>{{ t('wiki.mindmap.emptyResult') }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 创建/编辑全屏页面 -->
     <div v-if="editorMode" class="editor-page">
       <div class="editor-header">
@@ -57,9 +132,14 @@
           <h1>{{ t('wiki.title') }}</h1>
           <p>{{ t('wiki.subtitle') }}</p>
         </div>
-        <el-button type="primary" @click="openCreate">
-          <el-icon><Plus /></el-icon>{{ t('common.action.createDoc') }}
-        </el-button>
+        <div class="header-actions">
+          <el-button type="primary" @click="openCreate">
+            <el-icon><Plus /></el-icon>{{ t('common.action.createDoc') }}
+          </el-button>
+          <el-button @click="openMindmap">
+            <el-icon><Sparkles /></el-icon>{{ t('wiki.mindmap.btn') }}
+          </el-button>
+        </div>
       </div>
 
       <div class="wiki-layout">
@@ -135,9 +215,9 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Document, Upload, FileText, RefreshCw } from '@element-plus/icons-vue'
+import { Plus, Document, Upload, FileText, RefreshCw, Sparkles, CopyDocument } from '@element-plus/icons-vue'
 import { marked } from 'marked'
-import { getWikiPages, getWikiPage, createWikiPage, updateWikiPage, deleteWikiPage, getUploadUrl, uploadFile, processDocument, getProcessStatus } from '@/api/wiki'
+import { getWikiPages, getWikiPage, createWikiPage, updateWikiPage, deleteWikiPage, getUploadUrl, uploadFile, processDocument, getProcessStatus, generateMindmap, generateMindmapWithNav } from '@/api/wiki'
 
 const { t } = useI18n()
 
@@ -145,9 +225,18 @@ const searchQuery = ref('')
 const treeData = ref([])
 const selectedPage = ref(null)
 const editorMode = ref(null) // null | 'create' | 'edit'
+const mindmapMode = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
 const loadingPage = ref(false)
+const generating = ref(false)
+
+// 思维导图相关
+const mindmapContent = ref('')
+const mindmapFormat = ref('mermaid')
+const mindmapDepth = ref(3)
+const useNavigation = ref(true)
+const mindmapResult = ref('')
 
 const editorForm = reactive({
   id: null,
@@ -351,6 +440,62 @@ async function handleDelete() {
 function sensitivityType(s) {
   const map = { public: 'success', internal: 'warning', confidential: 'danger', secret: 'danger' }
   return map[s] || 'info'
+}
+
+// 思维导图相关方法
+function openMindmap() {
+  mindmapMode.value = true
+}
+
+function closeMindmap() {
+  mindmapMode.value = false
+  mindmapContent.value = ''
+  mindmapResult.value = ''
+}
+
+async function generateMindmap() {
+  if (!mindmapContent.value.trim()) {
+    ElMessage.warning(t('wiki.mindmap.contentRequired'))
+    return
+  }
+  
+  generating.value = true
+  try {
+    let result
+    if (useNavigation.value) {
+      result = await generateMindmapWithNav(
+        mindmapContent.value,
+        mindmapFormat.value,
+        mindmapDepth.value
+      )
+    } else {
+      result = await generateMindmap(
+        mindmapContent.value,
+        mindmapFormat.value,
+        mindmapDepth.value
+      )
+    }
+    mindmapResult.value = result.mindmap
+    ElMessage.success(t('wiki.mindmap.generateSuccess'))
+  } catch {
+    ElMessage.error(t('wiki.mindmap.generateFailed'))
+  } finally {
+    generating.value = false
+  }
+}
+
+function clearMindmap() {
+  mindmapContent.value = ''
+  mindmapResult.value = ''
+}
+
+async function copyMindmap() {
+  try {
+    await navigator.clipboard.writeText(mindmapResult.value)
+    ElMessage.success(t('common.msg.copySuccess'))
+  } catch {
+    ElMessage.error(t('common.msg.copyFailed'))
+  }
 }
 </script>
 
@@ -642,5 +787,114 @@ function sensitivityType(s) {
   font-size: var(--font-size-sm);
   margin-left: auto;
   margin-right: 12px;
+}
+
+/* ---- 思维导图面板 ---- */
+.mindmap-panel {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.mindmap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.mindmap-header h2 {
+  font-size: var(--font-size-xl);
+}
+
+.mindmap-body {
+  display: flex;
+  gap: 20px;
+}
+
+.mindmap-left, .mindmap-right {
+  flex: 1;
+}
+
+.mindmap-form :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.content-textarea {
+  width: 100%;
+  height: 200px;
+  resize: vertical;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.content-textarea:focus {
+  border-color: var(--color-primary);
+}
+
+.content-textarea:disabled {
+  background: #f9fafb;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.result-content {
+  background: #1e1e2e;
+  border-radius: var(--radius-md);
+  min-height: 300px;
+}
+
+.mindmap-output {
+  padding: 16px;
+  margin: 0;
+  color: #cdd6f4;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.empty-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  text-align: center;
+}
+
+.empty-result p {
+  margin-top: 12px;
+  color: var(--color-text-secondary);
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
 }
 </style>

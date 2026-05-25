@@ -99,10 +99,8 @@ def get_audit_log_repo() -> AuditLogRepository:
     return AuditLogRepository(adapter)
 
 
-def get_admin_service(
-    audit_log_repo: AuditLogRepository = Depends(get_audit_log_repo),
-) -> AdminService:
-    return AdminService(audit_log_repo)
+def get_admin_service() -> AdminService:
+    return AdminService()
 
 
 def get_qa_service() -> QAService:

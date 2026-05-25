@@ -14,3 +14,11 @@ export const uploadFile = (url, file) => {
 }
 export const processDocument = (pageId, fileId) => request.post('/storage/process-document', { page_id: pageId, file_id: fileId })
 export const getProcessStatus = (pageId) => request.get(`/storage/process-status/${pageId}`)
+
+// 思维导图相关
+export const generateMindmap = (text, format = 'mermaid', depth = 3) =>
+  request.post('/wiki/mindmap', { text, format, depth })
+
+// 结合导航结构生成思维导图
+export const generateMindmapWithNav = (text, format = 'mermaid', depth = 3) =>
+  request.post('/wiki/mindmap/integrate', { text, format, depth })

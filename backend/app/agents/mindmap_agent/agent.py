@@ -20,12 +20,13 @@ class MindMapAgent:
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["generate", "convert", "simplify", "expand"]
+                    "enum": ["generate", "convert", "simplify", "expand", "integrate"]
                 },
                 "data": {"type": "object"},
                 "text": {"type": "string"},
                 "format": {"type": "string", "enum": ["json", "mermaid", "markdown"]},
-                "depth": {"type": "integer", "minimum": 1, "maximum": 5}
+                "depth": {"type": "integer", "minimum": 1, "maximum": 5},
+                "use_navigation": {"type": "boolean", "default": True}
             },
             "required": ["action"]
         },
@@ -44,6 +45,7 @@ class MindMapAgent:
     )
     
     def __init__(self, db_session, user: UserContext):
+        self.db_session = db_session
         self.user = user
         self.llm = LLMService()
     
@@ -116,6 +118,27 @@ class MindMapAgent:
                     },
                     sources=[{"type": "mindmap", "action": "expand"}],
                     confidence=0.8
+                )
+            
+            elif action == "integrate":
+                text = request.params.get("text", "")
+                nav_tree = await self._get_nav_tree()
+                mindmap = await self._generate_with_nav(text, nav_tree, format_type, depth)
+                
+                return MCPResponse(
+                    success=True,
+                    data={
+                        "mindmap": mindmap,
+                        "format": format_type,
+                        "nodes": self._count_nodes(mindmap),
+                        "depth": depth,
+                        "aligned_with_navigation": True
+                    },
+                    sources=[
+                        {"type": "mindmap", "action": "integrate"},
+                        {"type": "navigation", "action": "get_tree"}
+                    ],
+                    confidence=0.85
                 )
             
             else:
@@ -241,6 +264,55 @@ class MindMapAgent:
         for child in children:
             count += self._count_nodes_from_json(child)
         return count
+    
+    async def _get_nav_tree(self):
+        """通过MCP协议获取导航树"""
+        try:
+            registry = get_registry()
+            nav_agent = registry.get_agent("navigation_agent", self.db_session, self.user)
+            
+            if nav_agent:
+                request = MCPRequest(
+                    agent_id="navigation_agent",
+                    params={"action": "get_tree"}
+                )
+                response = await nav_agent.handle_request(request)
+                return response.data if response.success else {}
+            return {}
+        except Exception:
+            return {}
+    
+    async def _generate_with_nav(self, text: str, nav_tree: dict, format_type: str, depth: int) -> str:
+        """结合导航结构生成思维导图"""
+        if not text:
+            return ""
+        
+        nav_prompt = ""
+        if nav_tree:
+            nav_prompt = f"""
+
+参考以下知识导航结构来组织思维导图：
+{json.dumps(nav_tree, ensure_ascii=False)}
+
+请确保生成的思维导图与上述导航结构对齐。
+"""
+        
+        prompt = f"""
+根据以下文档内容生成思维导图：
+
+{text}
+
+{nav_prompt}
+
+要求：
+- 深度至少{depth}层
+- 结构清晰，符合逻辑
+"""
+        
+        try:
+            return await self.llm.generate_mindmap(prompt, format_type, depth)
+        except Exception:
+            return self._fallback_mindmap(text, format_type, depth)
 
 
 def register_agent() -> None:

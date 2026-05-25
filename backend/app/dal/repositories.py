@@ -257,6 +257,93 @@ class AuditLogRepository(ModelRepository):
             result = await session.execute(query)
             return result.scalars().all()
 
+    async def query(
+        self,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        user_id: Optional[str] = None,
+        action: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20
+    ) -> List[Any]:
+        async with await self._get_session() as session:
+            query = select(self.AuditLog)
+            
+            conditions = []
+            if start_time:
+                conditions.append(self.AuditLog.created_at >= start_time)
+            if end_time:
+                conditions.append(self.AuditLog.created_at <= end_time)
+            if user_id:
+                conditions.append(self.AuditLog.user_id == user_id)
+            if action:
+                conditions.append(self.AuditLog.action == action)
+            
+            if conditions:
+                query = query.where(and_(*conditions))
+            
+            query = query.order_by(self.AuditLog.created_at.desc())
+            query = query.offset((page - 1) * page_size).limit(page_size)
+            
+            result = await session.execute(query)
+            return result.scalars().all()
+
+    async def count(
+        self,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        user_id: Optional[str] = None,
+        action: Optional[str] = None
+    ) -> int:
+        async with await self._get_session() as session:
+            query = select(func.count(self.AuditLog.id))
+            
+            conditions = []
+            if start_time:
+                conditions.append(self.AuditLog.created_at >= start_time)
+            if end_time:
+                conditions.append(self.AuditLog.created_at <= end_time)
+            if user_id:
+                conditions.append(self.AuditLog.user_id == user_id)
+            if action:
+                conditions.append(self.AuditLog.action == action)
+            
+            if conditions:
+                query = query.where(and_(*conditions))
+            
+            result = await session.execute(query)
+            return result.scalar() or 0
+
+    async def export(
+        self,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        user_id: Optional[str] = None,
+        action: Optional[str] = None,
+        limit: int = 10000
+    ) -> List[Any]:
+        async with await self._get_session() as session:
+            query = select(self.AuditLog)
+            
+            conditions = []
+            if start_time:
+                conditions.append(self.AuditLog.created_at >= start_time)
+            if end_time:
+                conditions.append(self.AuditLog.created_at <= end_time)
+            if user_id:
+                conditions.append(self.AuditLog.user_id == user_id)
+            if action:
+                conditions.append(self.AuditLog.action == action)
+            
+            if conditions:
+                query = query.where(and_(*conditions))
+            
+            query = query.order_by(self.AuditLog.created_at.desc())
+            query = query.limit(limit)
+            
+            result = await session.execute(query)
+            return result.scalars().all()
+
 
 class CasbinRuleRepository(ModelRepository):
     def __init__(self, adapter: PostgreSQLAdapter):

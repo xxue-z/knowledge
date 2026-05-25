@@ -29,4 +29,19 @@ export default {
   delete: {
     confirm: 'Are you sure to delete this document? This action cannot be undone.',
   },
+  mindmap: {
+    btn: 'Generate Mindmap',
+    title: 'Mindmap Generator',
+    contentLabel: 'Document Content',
+    contentPlaceholder: 'Enter document content to generate mindmap...',
+    contentRequired: 'Please enter document content',
+    format: 'Output Format',
+    depth: 'Depth',
+    useNavigation: 'Use Navigation',
+    generateBtn: 'Generate Mindmap',
+    generateSuccess: 'Mindmap generated successfully',
+    generateFailed: 'Failed to generate mindmap',
+    preview: 'Preview',
+    emptyResult: 'Please enter content and click generate',
+  },
 }

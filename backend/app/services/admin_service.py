@@ -1,80 +1,89 @@
-from app.core.casbin_policy import (
-    check_permission,
-    get_user_permissions,
-    add_policy,
-    remove_policy,
-    add_role_for_user,
-    remove_role_for_user,
-    get_user_roles,
-)
+from datetime import datetime
+from typing import Optional, Dict, Any, List
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.dal.postgres import PostgreSQLAdapter
 from app.dal.repositories import AuditLogRepository
-from app.models.schemas import UserContext
 
 
 class AdminService:
-    def __init__(self, audit_log_repo: AuditLogRepository):
-        self.audit_log_repo = audit_log_repo
-
-    async def check_admin_access(self, user: UserContext) -> bool:
-        return "admin" in user.roles
-
-    async def check_policy_manage(self, user: UserContext) -> bool:
-        return await check_permission(user.roles, "casbin_policy", "manage")
-
-    async def get_audit_logs(
+    def __init__(self, db_session: AsyncSession = None):
+        if db_session:
+            self.db_session = db_session
+            self.use_session = True
+        else:
+            self.adapter = PostgreSQLAdapter()
+            self.use_session = False
+        self.audit_log_repo = AuditLogRepository(self.adapter)
+    
+    async def query_audit_logs(
         self,
-        user: UserContext,
-        target_user_id: str | None = None,
-        action: str | None = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        user_id: Optional[str] = None,
+        action: Optional[str] = None,
         page: int = 1,
-        page_size: int = 20,
-    ):
-        if not await self.check_admin_access(user):
-            raise PermissionError("Admin access required")
-        return await self.audit_log_repo.get_logs(target_user_id, action, page, page_size)
-
-    async def list_users(self, user: UserContext):
-        if not await self.check_admin_access(user):
-            raise PermissionError("Admin access required")
-        return []
-
-    async def get_permissions(self, user: UserContext):
-        if not await self.check_admin_access(user):
-            raise PermissionError("Admin access required")
-        if not await self.check_policy_manage(user):
-            raise PermissionError("Permission denied")
-        return await get_user_permissions(user.roles)
-
-    async def create_policy(self, user: UserContext, sub: str, obj: str, act: str):
-        if not await self.check_admin_access(user):
-            raise PermissionError("Admin access required")
-        if not await self.check_policy_manage(user):
-            raise PermissionError("Permission denied")
-        return await add_policy(sub, obj, act)
-
-    async def delete_policy(self, user: UserContext, sub: str, obj: str, act: str):
-        if not await self.check_admin_access(user):
-            raise PermissionError("Admin access required")
-        if not await self.check_policy_manage(user):
-            raise PermissionError("Permission denied")
-        return await remove_policy(sub, obj, act)
-
-    async def assign_role(self, user: UserContext, target_user: str, role: str):
-        if not await self.check_admin_access(user):
-            raise PermissionError("Admin access required")
-        if not await self.check_policy_manage(user):
-            raise PermissionError("Permission denied")
-        return await add_role_for_user(target_user, role)
-
-    async def unassign_role(self, user: UserContext, target_user: str, role: str):
-        if not await self.check_admin_access(user):
-            raise PermissionError("Admin access required")
-        if not await self.check_policy_manage(user):
-            raise PermissionError("Permission denied")
-        return await remove_role_for_user(target_user, role)
-
-    async def get_user_roles(self, user: UserContext, target_user: str):
-        if not await self.check_admin_access(user):
-            raise PermissionError("Admin access required")
-        roles = await get_user_roles(target_user)
-        return {"user": target_user, "roles": roles}
+        page_size: int = 20
+    ) -> Dict[str, Any]:
+        """查询审计日志列表"""
+        logs = await self.audit_log_repo.query(
+            start_time=start_time,
+            end_time=end_time,
+            user_id=user_id,
+            action=action,
+            page=page,
+            page_size=page_size
+        )
+        
+        total = await self.audit_log_repo.count(
+            start_time=start_time,
+            end_time=end_time,
+            user_id=user_id,
+            action=action
+        )
+        
+        return {
+            "items": [log.to_dict() for log in logs],
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
+    
+    async def get_audit_log_detail(self, log_id: int):
+        """获取审计日志详情"""
+        if self.use_session:
+            from app.models.audit import AuditLog
+            result = await self.db_session.execute(
+                __import__('sqlalchemy').select(AuditLog).where(AuditLog.id == log_id)
+            )
+            log = result.scalar_one_or_none()
+        else:
+            log = await self.audit_log_repo.get_by_id(log_id)
+        
+        if log:
+            return log.to_dict()
+        return None
+    
+    async def export_audit_logs(
+        self,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        user_id: Optional[str] = None,
+        action: Optional[str] = None
+    ) -> str:
+        """导出审计日志为CSV"""
+        logs = await self.audit_log_repo.export(
+            start_time=start_time,
+            end_time=end_time,
+            user_id=user_id,
+            action=action,
+            limit=10000
+        )
+        
+        lines = ["user_id,username,action,resource,status,ip_address,created_at,extra"]
+        for log in logs:
+            log_dict = log.to_dict()
+            line = f'"{log_dict.get("user_id", "")}","{log_dict.get("username", "")}","{log_dict.get("action", "")}","{log_dict.get("resource", "")}","{log_dict.get("status", "")}","{log_dict.get("ip_address", "")}","{log_dict.get("created_at", "")}","{log_dict.get("extra", "").replace('"', '""')}"'
+            lines.append(line)
+        
+        return "\n".join(lines)

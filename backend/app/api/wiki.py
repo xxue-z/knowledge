@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from uuid import UUID
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_active_user
+from app.db.session import get_db
 from app.models.schemas import (
     UserContext, WikiPageCreate, WikiPageUpdate,
     WikiPageResponse, WikiPageListResponse,
 )
 from app.services import get_wiki_service, WikiService
+from app.agents.mindmap_agent.agent import MindMapAgent
+from app.mcps import MCPRequest
 
 router = APIRouter()
 
@@ -92,3 +96,36 @@ async def search_wiki(
 ):
     """全文搜索 Wiki"""
     return await service.search(current_user, query, page, page_size)
+
+
+@router.post("/mindmap/integrate")
+async def generate_mindmap_with_nav(
+    text: str,
+    format: str = "mermaid",
+    depth: int = 3,
+    current_user: UserContext = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    结合导航结构生成思维导图
+    
+    将文档内容与知识导航树整合，生成符合导航结构的思维导图
+    """
+    agent = MindMapAgent(session, current_user)
+    
+    request = MCPRequest(
+        agent_id="mindmap_agent",
+        params={
+            "action": "integrate",
+            "text": text,
+            "format": format,
+            "depth": depth
+        }
+    )
+    
+    response = await agent.handle_request(request)
+    
+    if response.success:
+        return response.data
+    else:
+        raise HTTPException(status_code=500, detail=response.error)

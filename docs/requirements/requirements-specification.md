@@ -265,15 +265,15 @@ graph TD
 
 - [FR-MINDMAP-001: JSON树生成](detailed/FR-MINDMAP.md) ✅
 - [FR-MINDMAP-002: Mermaid转换](detailed/FR-MINDMAP.md) ✅
-- [FR-MINDMAP-003: 导航结构整合](detailed/FR-MINDMAP.md) ⚠️
+- [FR-MINDMAP-003: 导航结构整合](detailed/FR-MINDMAP.md) ✅
 
 #### 4.1.11 系统管理模块（FR-SYSTEM）
 
 - [FR-SYSTEM-001: 初始化向导](detailed/FR-SYSTEM.md) ✅
 - [FR-SYSTEM-002: 配置管理](detailed/FR-SYSTEM.md) ✅
 - [FR-SYSTEM-003: 连接测试](detailed/FR-SYSTEM.md) ✅
-- [FR-SYSTEM-004: 审计日志查询](detailed/FR-SYSTEM.md) ⚠️
-- [FR-SYSTEM-005: 热重载](detailed/FR-SYSTEM.md) ⚠️
+- [FR-SYSTEM-004: 审计日志查询](detailed/FR-SYSTEM.md) ✅
+- [FR-SYSTEM-005: 热重载](detailed/FR-SYSTEM.md) ✅
 
 #### 4.1.12 热力图模块（FR-HEATMAP）
 
@@ -354,11 +354,8 @@ graph TD
 
 #### 待实现功能 ⚠️
 
-1. **动态策略热更新**（FR-PERM-003）
-2. **审计日志查询API**（FR-SYSTEM-004）
-3. **系统热重载**（FR-SYSTEM-005）
-4. **思维导图导航结构整合**（FR-MINDMAP-003）
-5. **外源MCP支持**
+1. **系统热重载**（FR-SYSTEM-005）
+2. **外源MCP支持**
 
 ***
 
@@ -382,7 +379,7 @@ graph TD
 | 可视化输出    | 思维导图生成    | FR-MINDMAP-001                 | 思维导图Agent  | -                   | ✅ |
 | 可视化输出    | Mermaid转换 | FR-MINDMAP-002                 | 思维导图Agent  | mermaid-renderer    | ✅ |
 | 系统管理     | 初始化向导     | FR-SYSTEM-001                  | 系统服务       | -                   | ✅ |
-| 系统管理     | 审计日志      | FR-SYSTEM-004                  | 系统服务       | -                   | ⚠️ |
+| 系统管理     | 审计日志      | FR-SYSTEM-004                  | 系统服务       | -                   | ✅ |
 | 知识发现     | 查看热力图     | FR-HEATMAP-004                 | 热力图服务      | -                   | ✅ |
 | 知识发现     | 查看热门榜单    | FR-HEATMAP-002, FR-HEATMAP-003 | 热力图服务      | -                   | ✅ |
 | 知识发现     | 查看导航热度    | FR-HEATMAP-005                 | 热力图服务      | -                   | ✅ |
@@ -496,19 +493,20 @@ graph TD
 
 **待实现的功能：**
 
-1. **FR-PERM-003**: 动态策略热更新 - 支持Casbin策略的动态热更新
-2. **FR-SYSTEM-004**: 审计日志查询API - 提供审计日志的查询接口
-3. **FR-SYSTEM-005**: 系统热重载 - 支持配置和策略的热重载
-4. **FR-MINDMAP-003**: 思维导图导航结构整合 - 将思维导图与知识导航树进行整合
-5. **外源MCP支持** - 支持标准MCP Server的对接
+1. **FR-SYSTEM-005**: 系统热重载 - 支持配置和策略的热重载
+2. **外源MCP支持** - 支持标准MCP Server的对接
 
 ### 7.5 新增需求说明
 
 - **新增模块**: 热力图模块（FR-HEATMAP），包含9个功能需求，全部已实现
+- **新增模块**: 动态策略热更新（FR-PERM-003），已实现
+- **新增模块**: 思维导图导航整合（FR-MINDMAP-003），已实现
 - **新增文档**:
   - [2026-05-23-heatmap-design.md](file:///d:/Project/Claude/knowledge/docs/superpowers/specs/2026-05-23-heatmap-design.md) - 后端设计文档
   - [2026-05-23-heatmap-frontend-design.md](file:///d:/Project/Claude/knowledge/docs/superpowers/specs/2026-05-23-heatmap-frontend-design.md) - 前端设计文档
-- **已实现功能**: 前端热力图页面、Dashboard入口、API接口、检索事件埋点、后台聚合任务
+  - [2026-05-25-dynamic-policy-hot-update-design.md](file:///d:/Project/Claude/knowledge/docs/superpowers/specs/2026-05-25-dynamic-policy-hot-update-design.md) - 动态策略热更新设计文档
+  - [2026-05-25-mindmap-navigation-integration.md](file:///d:/Project/Claude/knowledge/docs/superpowers/plans/2026-05-25-mindmap-navigation-integration.md) - 思维导图导航整合实现计划
+- **已实现功能**: 前端热力图页面、Dashboard入口、API接口、检索事件埋点、后台聚合任务、动态策略热重载API、思维导图导航整合功能
 
 ### 7.6 对象存储与文档处理需求说明
 

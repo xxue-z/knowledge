@@ -29,3 +29,9 @@ export const initSystem = (data) => request.post('/system/init', data)
 
 // 权限策略
 export const reloadPolicies = () => request.post('/admin/policies/reload')
+
+// 审计日志相关
+export const getAuditLogs = (params) => request.get('/admin/audit-logs', { params })
+export const getAuditLogDetail = (id) => request.get(`/admin/audit-logs/${id}`)
+export const exportAuditLogs = (params) => 
+  request.get('/admin/audit-logs/export', { params, responseType: 'blob' })
