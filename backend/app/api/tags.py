@@ -9,10 +9,7 @@ from app.models.schemas import UserContext
 router = APIRouter()
 
 
-async def get_tags_service(
-    tag_repo: WikiTagRepository = None,
-    page_repo: WikiPageRepository = None,
-) -> TagsService:
+async def get_tags_service() -> TagsService:
     adapter = get_adapter()
     return TagsService(WikiTagRepository(adapter), WikiPageRepository(adapter))
 

@@ -7,7 +7,7 @@ router = APIRouter(prefix="/api/heatmap", tags=["heatmap"])
 
 @router.get("/queries")
 async def get_hot_queries(
-    time_range: str = Query("24h", regex="^(24h|7d|30d)$"),
+    time_range: str = Query("24h", pattern="^(24h|7d|30d)$"),
     limit: int = Query(10, ge=1, le=50),
     service: HeatmapService = Depends(get_heatmap_service),
 ):
@@ -17,7 +17,7 @@ async def get_hot_queries(
 
 @router.get("/documents")
 async def get_hot_documents(
-    time_range: str = Query("24h", regex="^(24h|7d|30d)$"),
+    time_range: str = Query("24h", pattern="^(24h|7d|30d)$"),
     limit: int = Query(10, ge=1, le=50),
     service: HeatmapService = Depends(get_heatmap_service),
 ):
@@ -28,7 +28,7 @@ async def get_hot_documents(
 @router.get("/timeline")
 async def get_timeline(
     date: str | None = Query(None),
-    granularity: str = Query("hour", regex="^(hour|day)$"),
+    granularity: str = Query("hour", pattern="^(hour|day)$"),
     service: HeatmapService = Depends(get_heatmap_service),
 ):
     return await service.get_timeline(date, granularity)
