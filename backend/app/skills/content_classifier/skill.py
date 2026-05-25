@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import List, Optional
 
 logger = logging.getLogger(__name__)
@@ -65,3 +66,26 @@ class ContentClassifierSkill:
             "sensitive_words": found,
             "suggestions": [f"检测到 {len(found)} 个敏感词"] if found else []
         }
+
+    async def format_text(self, text: str) -> str:
+        """格式化文本"""
+        text = text.strip()
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r' +', ' ', text)
+        return text
+
+    async def summarize(self, text: str, max_length: int = 200) -> str:
+        """文本摘要"""
+        if len(text) <= max_length:
+            return text
+        sentences = re.split(r'[。！？\n]', text)
+        summary = []
+        current_length = 0
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if sentence and current_length + len(sentence) <= max_length:
+                summary.append(sentence)
+                current_length += len(sentence) + 1
+            if current_length >= max_length:
+                break
+        return '。'.join(summary) + '。'

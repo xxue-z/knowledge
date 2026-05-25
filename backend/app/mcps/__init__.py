@@ -12,6 +12,8 @@ from .registry import (
     get_registry,
     create_mcp_client,
 )
+from .unified_client import UnifiedMCPClient
+from .external_client import ExternalMCPClient
 
 __all__ = [
     "AgentCapability",
@@ -20,6 +22,8 @@ __all__ = [
     "MCPClient",
     "AgentRegistry",
     "LocalMCPClient",
+    "UnifiedMCPClient",
+    "ExternalMCPClient",
     "get_registry",
     "create_mcp_client",
 ]

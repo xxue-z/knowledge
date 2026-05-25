@@ -28,23 +28,24 @@
 graph TD
     subgraph 知识平台系统
         subgraph 业务Agent层
-            RouterAgent[(路由Agent)]
-            PermissionAgent[(权限Agent)]
-            CoordinatorAgent[(协调Agent)]
-            SearchAgent[(检索服务层)]
+            SecurityAgent[(安全Agent)]
+            OrchestratorAgent[(编排Agent)]
+            WikiAgent[(Wiki Agent)]
             DBAgent[(轻库Agent)]
-            ContentAnalysisAgent[(内容分析Agent)]
+            VectorAgent[(向量Agent)]
             MindMapAgent[(思维导图Agent)]
         end
 
         subgraph 可复用Skill层
-            SQLInjectDetector[sql-inject-detector]
+            SecurityUtils[security-utils]
             ContentClassifier[content-classifier]
             MermaidRenderer[mermaid-renderer]
         end
 
         subgraph MCP协议层
-            MCPProtocol[MCP协议]
+            MCPProtocol[统一MCP协议]
+            InternalMCP[内嵌MCP]
+            ExternalMCP[外源MCP]
         end
     end
 
@@ -54,6 +55,7 @@ graph TD
         Milvus[(Milvus)]
         Redis[(Redis)]
         LLM[LLM服务]
+        ExternalMCPServers[外部MCP Servers]
     end
 
     subgraph 参与者
@@ -65,35 +67,37 @@ graph TD
         Auditor[审核员]
     end
 
-    Admin --> RouterAgent
-    Employee --> RouterAgent
-    HRManager --> RouterAgent
-    DeptManager --> RouterAgent
-    ContentAuthor --> RouterAgent
-    Auditor --> RouterAgent
+    Admin --> OrchestratorAgent
+    Employee --> OrchestratorAgent
+    HRManager --> OrchestratorAgent
+    DeptManager --> OrchestratorAgent
+    ContentAuthor --> OrchestratorAgent
+    Auditor --> OrchestratorAgent
 
-    RouterAgent --> PermissionAgent
-    RouterAgent --> CoordinatorAgent
-    CoordinatorAgent --> SearchAgent
-    CoordinatorAgent --> DBAgent
-    CoordinatorAgent --> ContentAnalysisAgent
-    CoordinatorAgent --> MindMapAgent
+    OrchestratorAgent --> SecurityAgent
+    OrchestratorAgent --> WikiAgent
+    OrchestratorAgent --> DBAgent
+    OrchestratorAgent --> VectorAgent
+    OrchestratorAgent --> MindMapAgent
+    OrchestratorAgent -.-> ExternalMCP
 
-    RouterAgent --> SQLInjectDetector
-    ContentAnalysisAgent --> ContentClassifier
+    SecurityAgent --> SecurityUtils
+    WikiAgent --> ContentClassifier
+    DBAgent --> SecurityUtils
     MindMapAgent --> MermaidRenderer
 
-    SearchAgent --> PostgreSQL
+    WikiAgent --> PostgreSQL
     DBAgent --> PostgreSQL
-    ContentAnalysisAgent --> PostgreSQL
-    PermissionAgent --> PostgreSQL
-    SearchAgent --> Milvus
+    VectorAgent --> Milvus
+    SecurityAgent --> PostgreSQL
 
-    RouterAgent --> LLM
-    ContentAnalysisAgent --> LLM
+    OrchestratorAgent --> LLM
     MindMapAgent --> LLM
 
-    MCPProtocol --> CoordinatorAgent
+    MCPProtocol --> InternalMCP
+    MCPProtocol --> ExternalMCP
+    InternalMCP --> OrchestratorAgent
+    ExternalMCP --> ExternalMCPServers
 ```
 
 ### 2.2 参与者清单
@@ -311,30 +315,31 @@ graph TD
 
 ### 6.2 Agent与Skill关系矩阵
 
-| 业务Agent | 职责 | 调用的Skill | 被协调Agent调用 |
+| 业务Agent | 职责 | 调用的Skill | 被编排Agent调用 |
 |-----------|------|-------------|----------------|
-| **路由Agent** | 意图识别、权限预检、SQL注入检测 | sql-inject-detector | ✅ |
-| **权限Agent** | RBAC/ABAC鉴权、敏感字段脱敏 | - | ✅ |
-| **检索服务层** | Wiki文档CRUD+全文检索、向量嵌入、语义搜索、混合检索 | - | ✅ |
-| **轻库Agent** | 员工档案查询、行级安全 | - | ✅ |
-| **内容分析Agent** | 敏感词过滤、格式优化、自动分类、导航节点管理 | content-classifier | ✅ |
+| **安全Agent** | SQL注入检测、RBAC鉴权、敏感字段脱敏 | security-utils | ✅ |
+| **编排Agent** | 意图识别、任务分解、跨Agent协调、结果聚合 | - | - |
+| **Wiki Agent** | Wiki文档CRUD、全文检索 | content-classifier | ✅ |
+| **轻库Agent** | 员工档案查询、行级安全 | security-utils | ✅ |
+| **向量Agent** | 向量嵌入、语义搜索 | - | ✅ |
 | **思维导图Agent** | 导图生成、知识整合 | mermaid-renderer | ✅ |
-| **协调Agent** | 复合任务分解、跨库查询、结果聚合 | - | - |
 | **热力图服务** | 检索埋点、热度统计、热门榜单、时间热力图 | - | ✅ |
 
 ### 6.3 Skill能力清单
 
 | Skill名称 | 能力描述 | 被调用方 | 状态 |
 |-----------|----------|----------|------|
-| `sql-inject-detector` | SQL注入检测与拦截 | 路由Agent | ✅ |
-| `content-classifier` | 内容分类、标签提取、语义聚类 | 内容分析Agent | ✅ |
+| `security-utils` | SQL注入检测、敏感词检测、敏感字段脱敏 | 安全Agent、轻库Agent | ⚠️ |
+| `content-classifier` | 内容分类、标签提取、语义聚类、格式优化、文本摘要 | Wiki Agent | ✅ |
 | `mermaid-renderer` | Mermaid语法生成与渲染 | 思维导图Agent | ✅ |
 
 ### 6.4 MCP协议层
 
 | 模块 | 职责 | 集成状态 |
 |------|------|----------|
-| **MCP协议** | MCP协议实现与服务注册 | ✅ |
+| **统一MCP协议** | 支持内嵌MCP和外源MCP | ⚠️ |
+| **内嵌MCP** | 自研Agent，注册表管理，低耦合 | ✅ |
+| **外源MCP** | 标准MCP Server，配置化管理 | ❌ |
 
 ---
 
@@ -344,34 +349,36 @@ graph TD
 - **PRD文档**: 30个用户故事，4个实施阶段
 - **需求规划**: 4个阶段，70+功能点，当前整体进度~50%
 - **项目结构**: 后端（FastAPI）、前端（Vue3）、基础设施（Docker）
+- **架构重构**: 从8个Agent重构为6个Agent，优化Skill调用方式，支持标准MCP协议
 
-### 7.2 已完成功能统计（8个Agent架构）
+### 7.2 已完成功能统计（旧架构，待迁移）
 #### 业务Agent层
-| Agent | 职责 | 总功能数 | 已完成 | 部分实现 | 未实现 | 完成率 |
-|-------|------|----------|--------|----------|--------|--------|
-| **路由Agent** | 意图识别、权限预检、SQL注入检测 | 2 | 2 | 0 | 0 | 100% |
-| **权限Agent** | RBAC/ABAC鉴权、敏感字段脱敏 | 3 | 2 | 1 | 0 | 67% |
-| **检索服务层** | Wiki文档CRUD+全文检索、向量嵌入、语义搜索、混合检索 | 9 | 8 | 1 | 0 | 89% |
-| **轻库Agent** | 员工档案查询、行级安全 | 4 | 2 | 2 | 0 | 50% |
-| **内容分析Agent** | 敏感词过滤、格式优化、自动分类、导航节点管理 | 9 | 6 | 0 | 3 | 67% |
-| **思维导图Agent** | 导图生成、知识整合 | 3 | 2 | 0 | 1 | 67% |
-| **协调Agent** | 复合任务分解、跨库查询、结果聚合 | 4 | 0 | 1 | 3 | 12.5% |
-| **系统服务** | 认证、配置、审计日志 | 9 | 7 | 1 | 1 | 78% |
-| **热力图服务** | 检索埋点、热度统计、热门榜单、时间热力图 | 9 | 6 | 2 | 1 | 67% |
-| **Agent层总计** | - | **52** | **35** | **7** | **10** | **~67%** |
+| Agent | 职责 | 总功能数 | 已完成 | 部分实现 | 未实现 | 完成率 | 迁移状态 |
+|-------|------|----------|--------|----------|--------|--------|----------|
+| **路由Agent** | 意图识别、权限预检、SQL注入检测 | 2 | 2 | 0 | 0 | 100% | 待合并到编排Agent |
+| **权限Agent** | RBAC/ABAC鉴权、敏感字段脱敏 | 3 | 2 | 1 | 0 | 67% | 待升级为安全Agent |
+| **Wiki Agent** | Wiki文档CRUD+全文检索 | - | - | - | - | 保持 |
+| **检索服务层** | 向量嵌入、语义搜索、混合检索 | 9 | 8 | 1 | 0 | 89% | 待拆分为向量Agent |
+| **轻库Agent** | 员工档案查询、行级安全 | 4 | 2 | 2 | 0 | 50% | 保持 |
+| **内容分析Agent** | 敏感词过滤、格式优化、自动分类、导航节点管理 | 9 | 6 | 0 | 3 | 67% | 待删除，功能移到Skill |
+| **思维导图Agent** | 导图生成、知识整合 | 3 | 2 | 0 | 1 | 67% | 保持 |
+| **协调Agent** | 复合任务分解、跨库查询、结果聚合 | 4 | 0 | 1 | 3 | 12.5% | 待合并到编排Agent |
+| **系统服务** | 认证、配置、审计日志 | 9 | 7 | 1 | 1 | 78% | 保持 |
+| **热力图服务** | 检索埋点、热度统计、热门榜单、时间热力图 | 9 | 6 | 2 | 1 | 67% | 保持 |
 
 #### 可复用Skill层
-| Skill | 能力 | 状态 |
-|-------|------|------|
-| `sql-inject-detector` | SQL注入检测与拦截 | ✅ |
-| `content-classifier` | 内容分类、标签提取、语义聚类 | ✅ |
-| `mermaid-renderer` | Mermaid语法生成与渲染 | ✅ |
-| **Skill层总计** | - | **3/3 (100%)** |
+| Skill | 能力 | 状态 | 迁移状态 |
+|-------|------|------|----------|
+| `sql-inject-detector` | SQL注入检测与拦截 | ✅ | 待合并到security-utils |
+| `content-classifier` | 内容分类、标签提取、语义聚类 | ✅ | 待扩展（增加格式化、摘要） |
+| `mermaid-renderer` | Mermaid语法生成与渲染 | ✅ | 保持 |
+| `security-utils` | SQL注入检测、敏感词检测、敏感字段脱敏 | ❌ | 待创建 |
 
 #### MCP协议层
-| 模块 | 职责 | 状态 |
-|------|------|------|
-| **MCP协议** | MCP协议实现与服务注册 | ✅ |
+| 模块 | 职责 | 状态 | 迁移状态 |
+|------|------|------|----------|
+| **MCP协议** | MCP协议实现与服务注册 | ✅ | 待升级为统一MCP协议 |
+| **外源MCP支持** | 标准MCP Server对接 | ❌ | 待开发 |
 
 ---
 

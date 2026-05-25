@@ -7,6 +7,8 @@ from app.skills.registry import SkillCapability, get_skill_registry
 
 logger = logging.getLogger(__name__)
 
+SKILL_HANDLERS = {}
+
 
 def _register_content_classifier():
     """注册内容分类 Skill"""
@@ -15,13 +17,14 @@ def _register_content_classifier():
     capability = SkillCapability(
         skill_id="content_classifier",
         name="内容分类器",
-        description="对文本进行分类、提取关键词、检测敏感词",
+        description="对文本进行分类、提取关键词、检测敏感词、格式化、摘要",
         input_schema={
             "type": "object",
             "properties": {
                 "text": {"type": "string"},
-                "action": {"type": "string", "enum": ["classify", "extract_keywords", "detect_sensitive"]},
-                "categories": {"type": "array"}
+                "action": {"type": "string", "enum": ["classify", "extract_keywords", "detect_sensitive", "format_text", "summarize"]},
+                "categories": {"type": "array"},
+                "max_length": {"type": "integer"}
             },
             "required": ["text", "action"]
         },
@@ -32,10 +35,12 @@ def _register_content_classifier():
                 "confidence": {"type": "number"},
                 "keywords": {"type": "array"},
                 "has_sensitive": {"type": "boolean"},
-                "sensitive_words": {"type": "array"}
+                "sensitive_words": {"type": "array"},
+                "formatted_text": {"type": "string"},
+                "summary": {"type": "string"}
             }
         },
-        supported_tasks=["content_classification", "keyword_extraction", "sensitive_detection"],
+        supported_tasks=["content_classification", "keyword_extraction", "sensitive_detection", "text_formatting", "text_summarization"],
         version="1.0",
         priority=100
     )
@@ -50,6 +55,10 @@ def _register_content_classifier():
             return {"keywords": await skill.extract_keywords(params["text"])}
         elif action == "detect_sensitive":
             return await skill.detect_sensitive(params["text"])
+        elif action == "format_text":
+            return {"formatted_text": await skill.format_text(params["text"])}
+        elif action == "summarize":
+            return {"summary": await skill.summarize(params["text"], params.get("max_length", 200))}
         else:
             return {"error": f"Unknown action: {action}"}
     
@@ -137,11 +146,65 @@ def _register_intent_classifier():
     registry.register(capability, handler)
 
 
+def _register_security_utils():
+    """注册安全工具 Skill"""
+    from app.skills.security_utils import SecurityUtilsSkill
+    
+    capability = SkillCapability(
+        skill_id="security_utils",
+        name="安全工具",
+        description="SQL注入检测、敏感词检测、敏感字段脱敏",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["detect_sql_injection", "detect_sensitive_words", "mask_sensitive_fields"]},
+                "text": {"type": "string"},
+                "data": {"type": "object"},
+                "resource_type": {"type": "string"}
+            },
+            "required": ["action"]
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "has_injection": {"type": "boolean"},
+                "has_sensitive": {"type": "boolean"},
+                "patterns_found": {"type": "array"},
+                "sensitive_words": {"type": "array"},
+                "data": {"type": "object"}
+            }
+        },
+        supported_tasks=["sql_injection_detection", "sensitive_word_detection", "data_masking"],
+        version="1.0",
+        priority=50
+    )
+    
+    async def handler(params: Dict[str, Any]) -> Dict[str, Any]:
+        skill = SecurityUtilsSkill()
+        action = params.get("action")
+        
+        if action == "detect_sql_injection":
+            return await skill.detect_sql_injection(params.get("text", ""))
+        elif action == "detect_sensitive_words":
+            return await skill.detect_sensitive_words(params.get("text", ""))
+        elif action == "mask_sensitive_fields":
+            return {"data": await skill.mask_sensitive_fields(
+                params.get("data", {}),
+                params.get("resource_type", "")
+            )}
+        else:
+            return {"error": f"Unknown action: {action}"}
+    
+    registry = get_skill_registry()
+    registry.register(capability, handler)
+
+
 def register_all_skills() -> None:
     """注册所有 Skills"""
     _register_content_classifier()
     _register_mermaid_renderer()
     _register_intent_classifier()
+    _register_security_utils()
     
     registry = get_skill_registry()
     logger.info(f"All skills registered: {len(registry.skills)} skills available")
@@ -156,9 +219,16 @@ def get_skill_handler(skill_id: str):
     return None
 
 
-async def execute_skill(skill_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
-    """执行指定的 Skill"""
+async def execute_skill(skill_id: str, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """统一调用 Skill 的接口"""
     handler = get_skill_handler(skill_id)
-    if handler:
-        return await handler(params)
-    return {"error": f"Skill not found: {skill_id}"}
+    if not handler:
+        return {"success": False, "error": f"Skill not found: {skill_id}"}
+    
+    try:
+        params_with_action = params.copy()
+        params_with_action["action"] = action
+        result = await handler(params_with_action)
+        return {"success": True, "data": result}
+    except Exception as e:
+        return {"success": False, "error": str(e)}

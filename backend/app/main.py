@@ -44,19 +44,19 @@ async def check_system_initialized():
 
 async def init_agents():
     from app.agents import (
+        register_security_agent,
+        register_orchestrator_agent,
         register_db_agent,
         register_wiki_agent,
         register_vector_agent,
-        register_permission_agent,
-        register_content_analysis_agent,
         register_mindmap_agent,
     )
     
+    register_security_agent()
+    register_orchestrator_agent()
     register_db_agent()
     register_wiki_agent()
     register_vector_agent()
-    register_permission_agent()
-    register_content_analysis_agent()
     register_mindmap_agent()
 
 
