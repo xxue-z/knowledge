@@ -307,7 +307,17 @@ async function testConnection(type) {
   try {
     const configs = type === 'llm' ? { ...form.llm } : { ...form[type] }
     const result = await testApi(type, configs)
-    result.success ? ElMessage.success(result.message) : ElMessage.error(result.message)
+    if (result.success) {
+      const successMessages = {
+        database: t('setup.database.testSuccess'),
+        redis: t('setup.redis.testSuccess'),
+        milvus: t('setup.milvus.testSuccess'),
+        llm: t('setup.llm.testSuccess'),
+      }
+      ElMessage.success(successMessages[type] || result.message)
+    } else {
+      ElMessage.error(result.message)
+    }
   } catch { ElMessage.error(t('common.msg.testFailed')) }
   finally { testing.value = null }
 }
