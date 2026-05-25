@@ -30,9 +30,7 @@ class ChunkingRuleReorder(BaseModel):
     orders: list[dict]
 
 
-async def get_chunking_service(
-    rule_repo: ChunkingRuleRepository = None,
-) -> ChunkingService:
+async def get_chunking_service() -> ChunkingService:
     adapter = get_adapter()
     return ChunkingService(ChunkingRuleRepository(adapter))
 
