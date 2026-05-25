@@ -124,8 +124,8 @@ function saveRemember() {
 }
 
 const rules = {
-  username: [{ required: true, message: t('login.usernamePlaceholder'), trigger: 'blur' }],
-  password: [{ required: true, message: t('login.passwordPlaceholder'), trigger: 'blur' }],
+  username: [{ required: true, message: t('login.requiredUsername'), trigger: 'blur' }],
+  password: [{ required: true, message: t('login.requiredPassword'), trigger: 'blur' }],
 }
 
 async function handleLogin() {

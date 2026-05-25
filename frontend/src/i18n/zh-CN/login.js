@@ -5,6 +5,8 @@ export default {
   usernamePlaceholder: '请输入用户名',
   password: '密码',
   passwordPlaceholder: '请输入密码',
+  requiredUsername: '请输入用户名',
+  requiredPassword: '请输入密码',
   login: '登录',
   remember: '记住密码',
   loggingIn: '正在登录...',

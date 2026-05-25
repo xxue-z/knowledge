@@ -5,6 +5,8 @@ export default {
   usernamePlaceholder: 'Enter username',
   password: 'Password',
   passwordPlaceholder: 'Enter password',
+  requiredUsername: 'Please enter username',
+  requiredPassword: 'Please enter password',
   login: 'Login',
   remember: 'Remember me',
   loggingIn: 'Logging in...',
