@@ -8,6 +8,7 @@ export default {
     milvus: '向量库',
     storage: '对象存储',
     security: '安全',
+    policies: '权限策略',
     account: '账号安全',
   },
   storage: {
@@ -93,5 +94,15 @@ export default {
     pwdMismatch: '密码不一致',
     pwdSuccess: '密码修改成功',
     builtinNoChange: '内置管理员不支持修改密码，请先完成系统初始化',
+  },
+  policies: {
+    title: '权限策略管理',
+    description: '管理系统权限策略，支持动态重载 Casbin 策略而无需重启服务。',
+    currentVersion: '当前版本',
+    lastReload: '最后重载时间',
+    reloadBtn: '重载策略',
+    reloadSuccess: '策略重载成功',
+    reloadFailed: '策略重载失败',
+    warning: '注意：策略重载会立即生效，请确保修改的策略正确无误。',
   },
 }

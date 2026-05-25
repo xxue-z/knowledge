@@ -1,12 +1,15 @@
 import casbin
 import casbin_sqlalchemy_adapter
 import logging
-from functools import lru_cache
 
 from app.config import get_settings
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
+
+# 全局变量替代lru_cache
+_enforcer = None
+_policy_version = 0
 
 RBAC_MODEL = """
 [request_definition]
@@ -51,13 +54,18 @@ DEFAULT_ROLES = [
 ]
 
 
-@lru_cache()
-def get_enforcer() -> casbin.Enforcer:
-    adapter = casbin_sqlalchemy_adapter.Adapter(settings.DATABASE_URL)
-    model = casbin.model.Model()
-    model.load_model_from_text(RBAC_MODEL)
-    enforcer = casbin.Enforcer(model, adapter)
-    return enforcer
+def get_enforcer(refresh: bool = False) -> casbin.Enforcer:
+    """获取Enforcer实例，支持刷新"""
+    global _enforcer, _policy_version
+    
+    if refresh or _enforcer is None:
+        adapter = casbin_sqlalchemy_adapter.Adapter(settings.DATABASE_URL)
+        model = casbin.model.Model()
+        model.load_model_from_text(RBAC_MODEL)
+        _enforcer = casbin.Enforcer(model, adapter)
+        _policy_version += 1
+    
+    return _enforcer
 
 
 def _init_default_policies(enforcer: casbin.Enforcer):
@@ -124,3 +132,18 @@ async def get_user_roles(user: str) -> list[str]:
 async def init_policies():
     enforcer = get_enforcer()
     _init_default_policies(enforcer)
+
+
+async def reload_policies() -> dict:
+    """重新加载策略"""
+    global _enforcer
+    _enforcer = None  # 清空缓存
+    get_enforcer(refresh=True)
+    
+    logger.info(f"Casbin policies reloaded, version: {_policy_version}")
+    
+    return {
+        "success": True,
+        "message": "Policies reloaded successfully",
+        "version": _policy_version
+    }

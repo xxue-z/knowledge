@@ -26,3 +26,6 @@ export const fetchModelsFromAPI = (provider, api_key, api_base) =>
 
 // 系统初始化
 export const initSystem = (data) => request.post('/system/init', data)
+
+// 权限策略
+export const reloadPolicies = () => request.post('/admin/policies/reload')

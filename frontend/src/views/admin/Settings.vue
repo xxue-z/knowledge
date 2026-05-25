@@ -195,6 +195,43 @@
         </div>
       </el-tab-pane>
 
+      <!-- 权限策略 -->
+      <el-tab-pane :label="t('settings.tabs.policies')" name="policies">
+        <div class="tab-content" v-loading="reloadingPolicies" :element-loading-text="t('common.status.processing')">
+          <el-card class="policy-card">
+            <div class="policy-header">
+              <h3>{{ t('settings.policies.title') }}</h3>
+              <p>{{ t('settings.policies.description') }}</p>
+            </div>
+            <div class="policy-info">
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <div class="info-item">
+                    <span class="info-label">{{ t('settings.policies.currentVersion') }}</span>
+                    <span class="info-value">{{ policyVersion }}</span>
+                  </div>
+                </el-col>
+                <el-col :span="12">
+                  <div class="info-item">
+                    <span class="info-label">{{ t('settings.policies.lastReload') }}</span>
+                    <span class="info-value">{{ lastReloadTime || t('common.label.never') }}</span>
+                  </div>
+                </el-col>
+              </el-row>
+            </div>
+            <div class="policy-actions">
+              <el-button type="primary" :loading="reloadingPolicies" @click="handleReloadPolicies">
+                {{ t('settings.policies.reloadBtn') }}
+              </el-button>
+              <el-button @click="loadPolicyInfo">{{ t('common.btn.refresh') }}</el-button>
+            </div>
+            <el-alert type="warning" :closable="false" show-icon class="policy-alert">
+              <p>{{ t('settings.policies.warning') }}</p>
+            </el-alert>
+          </el-card>
+        </div>
+      </el-tab-pane>
+
       <!-- 账号安全 -->
       <el-tab-pane :label="t('settings.tabs.account')" name="account">
         <div class="tab-content" v-loading="saving === 'password'" :element-loading-text="t('common.status.saving')">
@@ -227,6 +264,7 @@ const { t } = useI18n()
 import {
   getCategoryConfig, updateCategoryConfig, testConnection,
   getLLMProviders, getProviderDefaultConfig,
+  reloadPolicies,
 } from '@/api/system'
 import { testStorageConnection } from '@/api/storage'
 import request from '@/api/request'
@@ -235,6 +273,11 @@ const activeTab = ref('llm')
 const providers = ref([])
 const saving = ref(null)
 const testing = ref(null)
+
+// 权限策略相关
+const reloadingPolicies = ref(false)
+const policyVersion = ref(0)
+const lastReloadTime = ref('')
 
 const llmForm = reactive({ provider: '', api_key: '', api_base: '', model: '', embedding_model: '', embedding_dim: '1536' })
 const dbForm = reactive({ host: 'localhost', port: '5432', user: 'knowledge', password: '', name: 'knowledge' })
@@ -385,6 +428,29 @@ async function handleChangePassword() {
   } catch {}
   finally { saving.value = null }
 }
+
+async function handleReloadPolicies() {
+  reloadingPolicies.value = true
+  try {
+    const result = await reloadPolicies()
+    if (result.success) {
+      policyVersion.value = result.version
+      lastReloadTime.value = new Date().toLocaleString()
+      ElMessage.success(t('settings.policies.reloadSuccess'))
+    } else {
+      ElMessage.error(result.message || t('settings.policies.reloadFailed'))
+    }
+  } catch (error) {
+    ElMessage.error(t('settings.policies.reloadFailed'))
+  } finally {
+    reloadingPolicies.value = false
+  }
+}
+
+function loadPolicyInfo() {
+  // 刷新策略信息（可以扩展获取更多信息）
+  ElMessage.info(t('common.msg.refreshed'))
+}
 </script>
 
 <style scoped>
@@ -401,4 +467,16 @@ async function handleChangePassword() {
 .url-preview { background: #f0f0f0; padding: 8px 12px; border-radius: var(--radius-md); margin-bottom: 16px; font-size: 13px; }
 .url-label { color: var(--color-text-secondary); }
 .url-preview code { color: #7C3AED; font-family: 'Cascadia Code', monospace; }
+
+/* 权限策略卡片样式 */
+.policy-card { margin-top: 16px; }
+.policy-header { margin-bottom: 20px; }
+.policy-header h3 { font-size: var(--font-size-lg); margin-bottom: 8px; }
+.policy-header p { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.policy-info { margin-bottom: 20px; }
+.info-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--color-bg-page); border-radius: var(--radius-md); }
+.info-label { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.info-value { font-weight: 600; color: var(--color-text-primary); }
+.policy-actions { display: flex; gap: 12px; margin-bottom: 16px; }
+.policy-alert { font-size: var(--font-size-sm); }
 </style>

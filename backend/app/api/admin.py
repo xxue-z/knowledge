@@ -109,3 +109,17 @@ async def get_user_role_list(
         return await service.get_user_roles(current_user, user)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+
+@router.post("/policies/reload")
+async def reload_policies_endpoint(
+    force: bool = True,
+    current_user: UserContext = Depends(get_current_active_user),
+):
+    from app.core.casbin_policy import reload_policies
+    
+    if "admin" not in current_user.roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    
+    result = await reload_policies()
+    return result

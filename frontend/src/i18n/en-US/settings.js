@@ -6,7 +6,9 @@ export default {
     database: 'Database',
     redis: 'Redis',
     milvus: 'Vector DB',
+    storage: 'Storage',
     security: 'Security',
+    policies: 'Permission Policies',
     account: 'Account Security',
   },
   llm: {
@@ -70,5 +72,15 @@ export default {
     pwdMismatch: 'Passwords do not match',
     pwdSuccess: 'Password changed successfully',
     builtinNoChange: 'Built-in admin cannot change password. Please complete system initialization first.',
+  },
+  policies: {
+    title: 'Permission Policy Management',
+    description: 'Manage system permission policies. Supports hot-reloading Casbin policies without restarting the service.',
+    currentVersion: 'Current Version',
+    lastReload: 'Last Reload Time',
+    reloadBtn: 'Reload Policies',
+    reloadSuccess: 'Policies reloaded successfully',
+    reloadFailed: 'Failed to reload policies',
+    warning: 'Note: Policy changes take effect immediately. Please ensure the modified policies are correct.',
   },
 }
