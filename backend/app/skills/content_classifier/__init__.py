@@ -1,6 +1,6 @@
 """Content Classifier Skill - 内容分类"""
 
-from .skill import ContentClassifierSkill, execute
+from .skill import ContentClassifierSkill
 
 __all__ = ["ContentClassifierSkill", "execute"]
 
