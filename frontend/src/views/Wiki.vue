@@ -43,7 +43,7 @@
             </el-row>
             <el-form-item>
               <div class="form-actions">
-                <el-button type="primary" :loading="generating" @click="generateMindmap">
+                <el-button type="primary" :loading="generating" @click="handleGenerateMindmap">
                   <el-icon><Sparkles /></el-icon>
                   {{ t('wiki.mindmap.generateBtn') }}
                 </el-button>
@@ -453,7 +453,7 @@ function closeMindmap() {
   mindmapResult.value = ''
 }
 
-async function generateMindmap() {
+async function handleGenerateMindmap() {
   if (!mindmapContent.value.trim()) {
     ElMessage.warning(t('wiki.mindmap.contentRequired'))
     return

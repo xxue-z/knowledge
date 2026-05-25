@@ -20,7 +20,7 @@
             <el-button text size="small" @click="editTag(data)">
               <el-icon><Edit /></el-icon>
             </el-button>
-            <el-button text size="small" type="danger" @click="deleteTag(data.id)">
+            <el-button text size="small" type="danger" @click="handleDeleteTag(data.id)">
               <el-icon><Delete /></el-icon>
             </el-button>
           </span>
@@ -128,7 +128,7 @@ async function handleSave() {
  ElMessage.error(t('common.msg.saveFailed'));
  }
 }
-async function deleteTag(id) {
+async function handleDeleteTag(id) {
  try {
  await ElMessageBox.confirm(t('tags.delete.confirm'), t('common.msg.confirmDelete'), { type: 'warning' });
  await deleteTag(id);
