@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { getUserInfo } from '@/api/auth'
+import { getSystemStatus } from '@/api/system'
 
 const routes = [
   {
@@ -71,8 +73,7 @@ const router = createRouter({
 
 async function checkSystemInitialized() {
   try {
-    const resp = await fetch('/api/system/status')
-    const data = await resp.json()
+    const data = await getSystemStatus()
     return data.initialized
   } catch {
     return true
@@ -81,15 +82,11 @@ async function checkSystemInitialized() {
 
 async function checkBuiltinAdmin(token) {
   try {
-    const resp = await fetch('/api/auth/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (resp.ok) {
-      const user = await resp.json()
-      return user.username === 'builtin-admin'
-    }
-  } catch {}
-  return false
+    const user = await getUserInfo(token)
+    return user.username === 'builtin-admin'
+  } catch {
+    return false
+  }
 }
 
 router.beforeEach(async (to, from, next) => {
