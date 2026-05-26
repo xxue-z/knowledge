@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import json
 import time
 from typing import Dict, Any
 
@@ -24,7 +25,7 @@ def generate_signature(params: Dict[str, Any], secret: str) -> str:
         params = {}
     
     sorted_keys = sorted(params.keys())
-    sign_string = '&'.join(f"{k}={params[k]}" for k in sorted_keys)
+    sign_string = '&'.join(f"{k}={json.dumps(params[k]) if isinstance(params[k], (dict, list)) else params[k]}" for k in sorted_keys)
     signature = hmac.new(secret.encode(), sign_string.encode(), hashlib.sha256).hexdigest()
     return signature
 
